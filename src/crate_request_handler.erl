@@ -162,5 +162,5 @@ do_request(#state{stmt=Stmt, args=Args, serverSpec=_ServerSpec, callerPid=Caller
   _EncodedPayload = jsx:encode(Payload),
   %hackney:request(<<"POST">>, ),
   % return static response
-  CallerPid ! #sql_response{cols=[<<"x">>, <<"y">>], rows=[[1,0],[0,1]], rowCount=2, duration=1},
+  CallerPid ! {self(), #sql_response{cols=[<<"x">>, <<"y">>], rows=[[1,0],[0,1]], rowCount=2, duration=1}},
   ok.

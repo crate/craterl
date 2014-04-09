@@ -8,129 +8,45 @@
 %%%-------------------------------------------------------------------
 -module(crate_erlang).
 
--behaviour(gen_server).
 
 %% API
--export([start_link/0, stop/0, sql/2]).
+-export([start/0, stop/0, sql/1, sql/2]).
 
-%% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
-
--define(SERVER, ?MODULE).
-
-%-record(state, {}).
+-compile([{parse_transform, lager_transform}]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
-%% @end
-%%--------------------------------------------------------------------
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
-stop() -> 
-    gen_server:call(?MODULE, stop).
+start() ->
+    lager:start(),
+    crate_request_handler_sup:start_link(),
+    connection_manager:start_link([{<<"localhost">>, 4200}]).
+
+sql(Stmt) ->
+    sql(Stmt, []).
+
 sql(Stmt, Args) ->
-    gen_server:call(?MODULE, {sql, Stmt, Args}).
+    case connection_manager:get_server() of
+        none_active ->
+            {error, "No active server"};
+        {ok, Server} ->
+            {ok, ChildPid} = crate_request_handler_sup:request(
+                               Stmt, Args, Server, self()),
+            receive
+                {ChildPid, {ok, SqlResponse}} ->
+                    connection_manager:add_active(Server),
+                    {ok, SqlResponse};
+                {ChildPid, {error, econnrefused}} ->
+                    connection_manager:add_inactive(Server),
+                    sql(Stmt, Args);
+                {ChildPid, Other} ->
+                    io:format("sql/other: ~p~n", [Other])
+            end
+    end.
 
-%%%===================================================================
-%%% gen_server callbacks
-%%%===================================================================
+stop() ->
+    connection_manager:terminate(normal, {}).
+    
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
-init([]) ->
-    {ok, ets:new(?MODULE,[])}.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @spec handle_call(Request, From, State) ->
-%%                                   {reply, Reply, State} |
-%%                                   {reply, Reply, State, Timeout} |
-%%                                   {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
-handle_call({sql, Stmt, Args}, _From, State) ->
-    lager:debug("handle_call(sql, ~p, ~p)", [Stmt, Args]),
-    {ok, Result} = perform_query(State),
-    Reply = {ok, Result},
-    {reply, Reply, State}.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling cast messages
-%%
-%% @spec handle_cast(Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
-terminate(_Reason, _State) ->
-    ok.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @end
-%%--------------------------------------------------------------------
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
-
-perform_query(_State) ->
-    {}.
+    

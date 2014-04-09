@@ -2,6 +2,9 @@
 
 -behaviour(application).
 
+%% API
+-export([get_env/2]).
+
 %% Application callbacks
 -export([start/2, stop/1]).
 
@@ -21,8 +24,14 @@ stop(PoolName) ->
     hackney_pool:stop_pool(PoolName),
     ok.
 
-get_env(Key, Default) ->
-  case application:get_env(Key) of
-    {ok, Val} -> Val;
-    undefined -> Default
+get_env(Key, Default) when is_atom(Key) ->
+  get_env(atom_to_list(Key), Default);
+get_env(Key, Default) when is_list(Key) ->
+  case os:getenv(string:to_upper(Key)) of
+    undefined ->
+      case application:get_env(Key) of
+        {ok, Val} -> Val;
+        undefined -> Default
+      end;
+    Value -> Value
   end.

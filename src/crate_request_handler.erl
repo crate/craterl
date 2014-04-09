@@ -13,6 +13,10 @@
 
 %% API
 -export([start_link/4]).
+-ifdef(TEST).
+-compile(export_all).
+-endif.
+
 
 %% gen_server callbacks
 -export([init/1,
@@ -152,15 +156,62 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-do_request(#state{stmt=Stmt, args=Args, serverSpec=_ServerSpec, callerPid=CallerPid}) ->
-  _Headers = [{<<"Content-Type">>, <<"application/json">>}],
-  _Options = [{pool, crate}],
+do_request(#state{stmt=Stmt, args=Args, serverSpec=ServerSpec, callerPid=CallerPid}) ->
+  Response = case hackney:request(<<"POST">>,
+    create_server_url(ServerSpec),
+    [{<<"Content-Type">>, <<"application/json">>}],
+    create_payload(Stmt, Args),
+    [{pool, crate}]
+  ) of
+    {ok, StatusCode, _RespHeaders, ClientRef} when StatusCode < 400 ->
+       % parse body
+       case hackney:body(ClientRef) of
+         {ok, Body} ->
+           case StatusCode of
+             StatusCode when StatusCode < 400 ->
+               {ok, build_response(Body)};
+             _ErrorCode ->
+               {error, build_error_response(Body)}
+           end;
+         {error, Reason} -> {error, Reason}
+       end;
+    {error, Reason} ->
+      {error, Reason}
+  end,
+  CallerPid ! {self(), Response}.
+
+create_payload(Stmt, Args) ->
   Payload = [
     {<<"stmt">>, Stmt},
     {<<"args">>, Args}
   ],
-  _EncodedPayload = jsx:encode(Payload),
-  %hackney:request(<<"POST">>, ),
-  % return static response
-  CallerPid ! {self(), #sql_response{cols=[<<"x">>, <<"y">>], rows=[[1,0],[0,1]], rowCount=2, duration=1}},
-  ok.
+  % TODO: handle incomplete input
+  jsx:encode(Payload).
+
+normalize_server_url(<<"http://", _/bitstring>>=Server) -> Server;
+normalize_server_url(<<"https://", _/bitstring>>=Server) -> Server;
+normalize_server_url(<<Server/bitstring>>) -> <<"http://", Server/bitstring>>.
+
+create_server_url({Host, Port}) when is_binary(Host) and is_integer(Port) ->
+  PortString = integer_to_binary(Port),
+  normalize_server_url(<<Host/bitstring, ":", PortString/binary, ?SQLPATH>>).
+
+
+build_response(Body) when is_binary(Body) ->
+  % TODO: handle incomplete input
+  Decoded = jsx:decode(Body),
+  #sql_response{
+    rowCount=proplists:get_value(<<"rowCount">>, Decoded, 0),
+    cols=proplists:get_value(<<"cols">>, Decoded, []),
+    rows=proplists:get_value(<<"rows">>, Decoded, []),
+    duration=proplists:get_value(<<"duration">>, Decoded, 0)
+  }.
+
+build_error_response(Body) when is_binary(Body) ->
+  % TODO: handle incomplete input
+  Decoded = jsx:decode(Body),
+  ErrorInfo = proplists:get_value(<<"error">>, Decoded, []),
+  #sql_error{
+    code=proplists:get_value(<<"code">>, ErrorInfo, ?DEFAULT_CODE),
+    message=proplists:get_value(<<"message">>, ErrorInfo, ?DEFAULT_MESSAGE)
+  }.

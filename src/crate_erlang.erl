@@ -10,7 +10,14 @@
 
 
 %% API
--export([start/0, stop/0, sql/1, sql/2]).
+-export([sql/1, sql/2, start/0]).
+
+start() ->
+  application:ensure_all_started(jsx),
+  application:ensure_all_started(hackney),
+  application:ensure_all_started(lager),
+  application:start(crate_erlang).
+
 
 sql(Stmt) ->
     sql(Stmt, []).
@@ -34,8 +41,6 @@ sql(Stmt, Args) ->
             end
     end.
 
-stop() ->
-    connection_manager:terminate(normal, {}).
     
 
     

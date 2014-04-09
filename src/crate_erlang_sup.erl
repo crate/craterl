@@ -23,6 +23,7 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
+    Servers = crate_erlang_app:get_env(crate_servers, [<<"localhost">>, 4200]),
     {ok,
       {{one_for_one, 5, 10},
         [{crate_req_sup,
@@ -30,7 +31,13 @@ init([]) ->
           permanent,
           5000,
           supervisor,
-          [crate_request_handler_sup]}
+          [crate_request_handler_sup]},
+         {crate_connection_manager,
+          {connection_manager, start_link, [Servers]},
+          permanent,
+          5000,
+          worker,
+          [connection_manager]}
         ]
       }
     }.

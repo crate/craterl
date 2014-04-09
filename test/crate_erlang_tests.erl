@@ -1,7 +1,6 @@
 -module(crate_erlang_tests).
 -include_lib("eunit/include/eunit.hrl").
 
-start_test() ->
-    crate_erlang:start_link().
-
-
+sql_select_simple_test() ->
+    connection_manager:start_link([{<<"localhost">>, 4200}]),
+    {ok, Result} = crate_erlang:sql(<<"select * from craty">>).

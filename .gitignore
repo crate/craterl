@@ -2,6 +2,7 @@
 .eunit
 /.idea/
 /deps/
+/log/
 *.o
 *.beam
 *.plt

@@ -23,5 +23,15 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, []} }.
+    {ok,
+      {{one_for_one, 5, 10},
+        [{crate_req_sup,
+          {crate_request_handler_sup, start_link, []},
+          permanent,
+          5000,
+          supervisor,
+          [crate_request_handler_sup]}
+        ]
+      }
+    }.
 

@@ -7,7 +7,9 @@
   {applications, [
                   kernel,
                   stdlib,
-                  jsx
+                  jsx,
+                  hackney,
+                  lager
                  ]},
   {mod, { crate_erlang_app, []}},
   {env, [

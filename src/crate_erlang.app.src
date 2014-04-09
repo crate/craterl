@@ -1,12 +1,18 @@
 {application, crate_erlang,
  [
-  {description, ""},
-  {vsn, "1"},
+  {description, "erlang client for crate data"},
+  {vsn, "0.0.1"},
   {registered, []},
+  {modules, []},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+                  jsx
                  ]},
   {mod, { crate_erlang_app, []}},
-  {env, []}
- ]}.
+  {env, [
+    {"servers", ["localhost:4200"]
+    }
+  ]}
+ ]
+}.

@@ -23,13 +23,7 @@ erl -pa ebin deps/*/ebin
 Use library from erlang shell, for testing, debuggin etc.:
 
 ```
-1> application:start(jsx).
-ok
-2> hackney:start().
-ok
-3> lager:start().
-ok
-4> application:start(crate_erlang).
+1> crate_erlang:start().
 ok
 5> crate_erlang:sql(<<"insert into table stuff (id, name) values (?, ?)">>, [1, <<"craty">>]).
 ...

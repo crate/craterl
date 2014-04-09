@@ -1,7 +1,7 @@
 crate-erlang
 ============
 
-Erlang client for crate
+Erlang client for crate.
 
 Installation
 ------------
@@ -27,17 +27,17 @@ Use library from erlang shell, for testing, debuggin etc.:
 ok
 2> hackney:start().
 ok
-3> application:start(crate_erlang).
+3> lager:start().
 ok
+4> application:start(crate_erlang).
+ok
+5> crate_erlang:sql(<<"insert into table stuff (id, name) values (?, ?)">>, [1, <<"craty">>]).
+...
 ```
-
-Then do your requests.
-
-
 
 Tests
 -----
 
-TBD
+Simply call ```rebar eunit skip_deps=true``` to run the tests for crate_erlang.
 
 

@@ -12,17 +12,6 @@
 %% API
 -export([start/0, stop/0, sql/1, sql/2]).
 
--compile([{parse_transform, lager_transform}]).
-
-%%%===================================================================
-%%% API
-%%%===================================================================
-
-start() ->
-    lager:start(),
-    crate_request_handler_sup:start_link(),
-    connection_manager:start_link([{<<"localhost">>, 4200}]).
-
 sql(Stmt) ->
     sql(Stmt, []).
 

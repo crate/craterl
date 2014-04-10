@@ -36,7 +36,7 @@ sql(Stmt, Args) ->
                     {ok, SqlResponse};
                 {ChildPid, {error, econnrefused}} ->
                     connection_manager:add_inactive(Server),
-                    {error, no_connection};
+                    sql(Stmt, Args);
                 {ChildPid, Other} ->
                     io:format("sql/other: ~p~n", [Other])
             end

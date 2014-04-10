@@ -16,7 +16,7 @@ simple_test() ->
 
 connection_manager_test_() ->
   {"test connection manager",
-    {setup,
+    {foreach,
       fun start/0, % setup function
       fun stop/1,
       [
@@ -27,16 +27,15 @@ connection_manager_test_() ->
 
 %%% setup
 start() ->
-  crate_erlang_sup:start_link(),
   os:putenv("CRATE_SERVERS", "localhost:4200"),
   connection_manager:start_link().
 
 %% teardown
-stop(_) -> ok.
+stop(_) -> connection_manager:stop().
 
-single_server_test({ok, _Pid}) ->
+single_server_test(_) ->
   [
-    ?_assertEqual(connection_manager:get_server(), <<"localhost:4200">>)
+    ?_assertEqual(connection_manager:get_server(), {ok, <<"localhost:4200">>})
   ].
 
 parse_server_string_test_() ->

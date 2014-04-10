@@ -14,7 +14,7 @@
 -compile([{parse_transform, lager_transform}]).
 
 %% API
--export([start_link/0, get_server/0, add_active/1, add_inactive/1]).
+-export([start_link/0, stop/0, get_server/0, add_active/1, add_inactive/1]).
 -ifdef(TEST).
 -compile(export_all).
 -endif.
@@ -49,6 +49,8 @@ add_active(Server) ->
 
 add_inactive(Server) ->
     gen_server:call(?MODULE, {add_inactive, Server}).
+
+stop() -> gen_server:cast(?MODULE, stop).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -144,6 +146,8 @@ handle_call(Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_cast(stop, State) ->
+    {stop, normal, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 

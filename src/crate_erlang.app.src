@@ -13,7 +13,7 @@
                  ]},
   {mod, {crate_erlang_app, []}},
   {env, [
-    {crate_servers, [{<<"localhost">>, 4200}]}
+    {crate_servers, ["localhost:4200"]}
   ]}
  ]
 }.

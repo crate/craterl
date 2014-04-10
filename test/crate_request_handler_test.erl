@@ -18,9 +18,9 @@ simple_test() ->
 server_uri_from_spec_test() ->
   ?assertEqual(
     <<"http://localhost:4200/_sql">>,
-    crate_request_handler:create_server_url({<<"localhost">>, 4200})),
-  ?assertEqual(<<"http://bla:123/_sql">>, crate_request_handler:create_server_url({<<"http://bla">>, 123})),
-  ?assertEqual(<<"https://secure:22/_sql">>, crate_request_handler:create_server_url({<<"https://secure">>, 22}))
+    crate_request_handler:create_server_url(<<"localhost:4200">>)),
+  ?assertEqual(<<"http://bla:123/_sql">>, crate_request_handler:create_server_url(<<"http://bla:123">>)),
+  ?assertEqual(<<"https://secure:22/_sql">>, crate_request_handler:create_server_url(<<"https://secure:22">>))
 .
 
 create_payload_test() ->
@@ -29,7 +29,7 @@ create_payload_test() ->
 
 build_response_test() ->
   ?assertEqual(#sql_response{rows = [[1,2,3],[4,5,6]], cols=[<<"x">>, <<"y">>, <<"z">>], rowCount = 2, duration = 4},
-    crate_request_handler:build_response(<<"{\"rows\":[[1,2,3],[4,5,6]], \"cols\":[\"x\",\"y\",\"z\"], \"rowCount\":2, \"duration\":4}">>)
+    crate_request_handler:build_response(<<"{\"rows\":[[1,2,3],[4,5,6]], \"cols\":[\"x\",\"y\",\"z\"], \"rowcount\":2, \"duration\":4}">>)
   ),
   ?assertEqual(#sql_response{},
     crate_request_handler:build_response(<<"{\"some\":\"weird\", \"stuff\":1}">>)

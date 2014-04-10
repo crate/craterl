@@ -34,11 +34,10 @@
 start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
--type server_spec() :: {Host :: binary(), Port :: integer()}.
 -spec request(Stmt, Args, ServerSpec, CallerPid) -> Result when
   Stmt :: binary(),
   Args :: list(),
-  ServerSpec :: server_spec(),
+  ServerSpec :: string() | binary(),
   CallerPid :: pid(),
   Result :: {ok, ChildPid :: pid()} | {error, Err :: term()}.
 request(Stmt, Args, ServerSpec, CallerPid) when is_binary(Stmt)

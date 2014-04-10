@@ -15,6 +15,9 @@
 
 %% API
 -export([start_link/0, get_server/0, add_active/1, add_inactive/1]).
+-ifdef(TEST).
+-compile(export_all).
+-endif.
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -63,10 +66,30 @@ add_inactive(Server) ->
 %% @end
 %%--------------------------------------------------------------------
 init(_) ->
-    Servers = config_provider:get(crate_servers, [?DEFAULT_SERVER]),
+    Servers = parse_servers_string(config_provider:get(crate_servers, [?DEFAULT_SERVER])),
     lager:info("Servers configured ~p", [Servers]),
     {ok, #connections{activelist=Servers,
                       inactivelist=[]}}.
+
+parse_servers_string(ServersString) when is_list(ServersString) ->
+  parse_servers_string(list_to_binary(ServersString));
+parse_servers_string(ServersString) when is_binary(ServersString) ->
+  lists:filter(
+    fun
+      (HostAndPort) when is_binary(HostAndPort) ->
+        case binary:split(HostAndPort, <<":">>) of
+          [_,_] -> true;
+          [_] -> false
+        end,
+        true;
+      (_) -> false
+    end,
+    lists:map(
+      fun(ServerString) -> binary:replace(ServerString, <<" ">>, <<"">>, [global]) end,
+      binary:split(ServersString, <<",">>, [global])
+    )
+  );
+parse_servers_string(_) -> [].
 
 %%--------------------------------------------------------------------
 %% @private

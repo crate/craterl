@@ -203,6 +203,6 @@ get_env(Key) when is_list(Key) ->
         {ok, Val} -> Val;
         undefined -> undefined
       end;
-    Value -> Value
+    Value -> list_to_binary(Value)
   end;
 get_env(_) -> undefined.

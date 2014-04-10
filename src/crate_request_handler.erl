@@ -27,6 +27,8 @@
   code_change/3]).
 
 -include("crate_erlang.hrl").
+-compile([{parse_transform, lager_transform}]).
+
 
 -define(SERVER, ?MODULE).
 
@@ -188,13 +190,23 @@ create_payload(Stmt, Args) ->
   % TODO: handle incomplete input
   jsx:encode(Payload).
 
-normalize_server_url(<<"http://", _/bitstring>>=Server) -> Server;
-normalize_server_url(<<"https://", _/bitstring>>=Server) -> Server;
-normalize_server_url(<<Server/bitstring>>) -> <<"http://", Server/bitstring>>.
+normalize_server_url(<<"http://", _/binary>>=Server) -> Server;
+normalize_server_url(<<"https://", _/binary>>=Server) -> Server;
+normalize_server_url(<<Server/binary>>) -> <<"http://", Server/binary>>.
 
-create_server_url({Host, Port}) when is_binary(Host) and is_integer(Port) ->
-  PortString = integer_to_binary(Port),
-  normalize_server_url(<<Host/bitstring, ":", PortString/binary, ?SQLPATH>>).
+create_server_url(<<_Host, ":", _Port>> = HostAndPort) ->
+  normalize_server_url(<<HostAndPort, ?SQLPATH/binary>>);
+create_server_url(Host) when is_binary(Host) ->
+  Url = case binary:split(Host, <<":">>) of
+    [_, _] ->
+      <<Host/binary, ?SQLPATH/binary>>;
+    [HostString] ->
+      PortString = integer_to_binary(?DEFAULT_PORT),
+      <<HostString, ":", PortString, ?SQLPATH/binary>>
+  end,
+  normalize_server_url(Url);
+create_server_url(HostStr) when is_list(HostStr) ->
+  create_server_url(list_to_binary(HostStr)).
 
 
 build_response(Body) when is_binary(Body) ->

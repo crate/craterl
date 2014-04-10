@@ -11,7 +11,7 @@
                   hackney,
                   lager
                  ]},
-  {mod, {crate_erlang_app, []}},
+  {mod, {craterl_app, []}},
   {env, [
     {crate_servers, [{<<"localhost">>, 4200}]}
   ]}

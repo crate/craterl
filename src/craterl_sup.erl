@@ -1,5 +1,5 @@
--module(crate_erlang_sup).
-
+-module(craterl_sup).
+ 
 -behaviour(supervisor).
 
 %% API

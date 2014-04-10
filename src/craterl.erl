@@ -17,7 +17,7 @@ start() ->
   application:ensure_all_started(jsx),
   application:ensure_all_started(hackney),
   application:ensure_all_started(lager),
-  application:start(crate_erlang).
+  application:start(craterl).
 
 
 sql(Stmt) ->

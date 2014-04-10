@@ -28,8 +28,8 @@ stop(_) ->
 
 simple_query_test(_) ->
     [
-     ?_assertMatch({ok, _},
-                   craterl:sql(<<"select * from sys.cluster">>))
+     ?_assertMatch({ok, {sql_response, _Cols, _Rows, _RowCnt, _Dur, _Wall, _RunT}},
+                    craterl:sql(<<"select * from sys.cluster">>))
      
     ].
 

@@ -29,6 +29,8 @@ sql(Stmt, Args) when is_list(Stmt) ->
     sql(list_to_binary(Stmt), Args);
 
 sql(Stmt, Args) when is_binary(Stmt) ->
+    statistics(runtime),
+    statistics(wall_clock),
     case connection_manager:get_server() of
         none_active ->
             {error, "No active server"};
@@ -38,7 +40,7 @@ sql(Stmt, Args) when is_binary(Stmt) ->
             receive
                 {ChildPid, {ok, SqlResponse}} ->
                     connection_manager:add_active(Server),
-                    {ok, SqlResponse};
+                    {ok, instrument(SqlResponse)};
                 {ChildPid, {error, econnrefused}} ->
                     lager:info("sql/econnrefused: ~p~n", [Server]),
                     connection_manager:add_inactive(Server),
@@ -52,6 +54,22 @@ sql(Stmt, Args) when is_binary(Stmt) ->
             end
     end.
 
-    
+instrument(#sql_response{
+              cols=Cols, rows=Rows,
+              rowCount=RowCnt,
+              duration=Duration,
+              wallclock=_, runtime=_
+             }) ->   
+    {_, RunTime} = statistics(runtime),
+    {_, WallClock} = statistics(wall_clock),
+    #sql_response{
+       cols=Cols, rows=Rows, 
+       rowCount=RowCnt, 
+       duration=Duration,
+       wallclock=WallClock,
+       runtime=RunTime
+      }.
+
+
 
     

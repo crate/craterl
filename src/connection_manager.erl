@@ -111,7 +111,7 @@ parse_servers_string(_) -> [].
 handle_call(getserver, _From, 
             #connections{activelist=Active, 
                          inactivelist=Inactive}) ->
-    io:format("getserver start ~p, ~p ~n", [Active, Inactive]),
+    lager:info("getserver start "),
     case lookup(Active, Inactive) of
         none_active -> {reply, none_active, #connections{activelist=Active, inactivelist=Inactive}};
         {Server, NewActive} -> {reply, {ok, Server}, #connections{activelist=NewActive, inactivelist=Inactive}}
@@ -119,14 +119,14 @@ handle_call(getserver, _From,
 handle_call({add_active, Server}, _From,
             #connections{activelist=Active,
                          inactivelist=Inactive}) ->
-    io:format("getserver active ~p; ~p, ~p ~n", [Server, Active, Inactive]),
+    lager:info("getserver active "),
     {reply, ok, #connections{activelist=[Server|Active],
                              inactivelist=Inactive}};
 
 handle_call({add_inactive, Server}, _From, 
             #connections{activelist=Active, 
                          inactivelist=Inactive}) ->
-    io:format("getserver inactive ~p; ~p, ~p ~n", [Server, Active, Inactive]),
+    lager:info("getserver inactive "),
     NewActive = lists:delete(Server, Active),
     {reply, ok, #connections{activelist=NewActive,
                              inactivelist=[Server|Inactive]}};

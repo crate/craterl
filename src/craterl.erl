@@ -13,6 +13,8 @@
 %% API
 -export([sql/1, sql/2, start/0]).
 
+-compile([{parse_transform, lager_transform}]).
+
 start() ->
   application:ensure_all_started(jsx),
   application:ensure_all_started(hackney),
@@ -23,7 +25,10 @@ start() ->
 sql(Stmt) ->
     sql(Stmt, []).
 
-sql(Stmt, Args) ->
+sql(Stmt, Args) when is_list(Stmt) ->
+    sql(list_to_binary(Stmt), Args);
+
+sql(Stmt, Args) when is_binary(Stmt) ->
     case connection_manager:get_server() of
         none_active ->
             {error, "No active server"};
@@ -35,10 +40,15 @@ sql(Stmt, Args) ->
                     connection_manager:add_active(Server),
                     {ok, SqlResponse};
                 {ChildPid, {error, econnrefused}} ->
+                    lager:info("sql/econnrefused: ~p~n", [Server]),
                     connection_manager:add_inactive(Server),
                     sql(Stmt, Args);
-                {ChildPid, Other} ->
-                    io:format("sql/other: ~p~n", [Other])
+                {ChildPid, {error, OtherError}} ->
+                    lager:info("sql/error other: ~p~n", [OtherError]),
+                    {error, OtherError};
+                Other ->
+                    lager:error("sql/other: ~p~n", [Other]),
+                    {error, Other}
             end
     end.
 

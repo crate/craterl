@@ -1,4 +1,4 @@
--module(crate_erlang_app).
+-module(craterl_app).
 
 -behaviour(application).
 
@@ -13,7 +13,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    {ok, Pid} = crate_erlang_sup:start_link(),
+    {ok, Pid} = craterl_sup:start_link(),
     PoolName = config_provider:get(crate_pool_name, crate),
     PoolSize = config_provider:get(crate_pool_size, 500),
     TimeOut = config_provider:get(crate_pool_timeout, 150000),

@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% @author Peter Sabaini <peter@sabaini.at>
 %%% @copyright (C) 2014, Peter Sabaini
-%%% @doc
+%%% @doc 
 %%%
 %%% @end
 %%% Created :  9 Apr 2014 by Peter Sabaini <peter@sabaini.at>
 %%%-------------------------------------------------------------------
--module(crate_erlang).
+-module(craterl).
 
 -include("crate_erlang.hrl").
 
@@ -17,7 +17,7 @@ start() ->
   application:ensure_all_started(jsx),
   application:ensure_all_started(hackney),
   application:ensure_all_started(lager),
-  application:start(crate_erlang).
+  application:start(craterl).
 
 
 sql(Stmt) ->

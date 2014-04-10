@@ -50,7 +50,7 @@ add_active(Server) ->
 add_inactive(Server) ->
     gen_server:call(?MODULE, {add_inactive, Server}).
 
-stop() -> gen_server:cast(?MODULE, stop).
+stop() -> gen_server:call(?MODULE, stop).
 
 %%%===================================================================
 %%% gen_server callbacks

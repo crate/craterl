@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 10. Apr 2014 9:53 AM
 %%%-------------------------------------------------------------------
--module(connection_manager_test).
+-module(connection_manager_tests).
 -author("mat").
 
 -include_lib("eunit/include/eunit.hrl").
@@ -28,10 +28,14 @@ connection_manager_test_() ->
 %%% setup
 start() ->
   os:putenv("CRATE_SERVERS", "localhost:4200"),
+  config_provider:start_link(),
   connection_manager:start_link().
 
 %% teardown
-stop(_) -> connection_manager:stop().
+stop(_) ->
+  config_provider:stop(),
+  connection_manager:stop(),
+  timer:sleep(100).
 
 single_server_test(_) ->
   [

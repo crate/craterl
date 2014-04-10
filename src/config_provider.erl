@@ -13,10 +13,14 @@
 -compile([{parse_transform, lager_transform}]).
 
 %% API
--export([start_link/0,
+-export([start_link/0, stop/0,
   get/1, get/2,
   reload/0, reload/1
 ]).
+-ifdef(TEST).
+-compile(export_all).
+-endif.
+
 
 %% gen_server callbacks
 -export([init/1,
@@ -44,6 +48,8 @@
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+
+stop() -> gen_server:cast(?SERVER, stop).
 
 get(Key) ->
   gen_server:call(?SERVER, {get, Key}).
@@ -115,6 +121,8 @@ handle_cast({reload}, _State) ->
   {noreply, load_config()};
 handle_cast({reload, Path}, _State) ->
   {noreply, load_config(Path)};
+handle_cast(stop, State) ->
+  {stop, normal, State};
 handle_cast(_Request, State) ->
   {noreply, State}.
 
@@ -174,23 +182,38 @@ load_config() ->
 
 load_config(ConfigFilePath) ->
   case file:consult(ConfigFilePath) of
-      {ok, Terms} -> Terms;
+      {ok, Terms} ->
+        lists:map(
+          fun
+            ({Key, Value}) when is_list(Key) -> {list_to_binary(Key), Value};
+            ({Key, Value}) when is_atom(Key) -> {atom_to_binary(Key, utf8), Value};
+            ({Key, Value}) -> {Key, Value}
+          end,
+          Terms);
       {error, Reason} ->
         lager:error("Error reading config file ~p: ~p", [ConfigFilePath, Reason]),
         []
   end.
 
-get_config_value(Key, DefaultConfig) ->
+get_config_value(Key, DefaultConfig) when is_list(DefaultConfig) ->
   case get_env(Key) of
-    undefined -> proplists:get_value(Key, DefaultConfig);
+    undefined ->
+      ConvertedKey = case Key of
+        Key when is_list(Key) -> list_to_binary(Key);
+        Key when is_atom(Key) -> atom_to_binary(Key, utf8);
+        Key -> Key
+      end,
+      proplists:get_value(ConvertedKey, DefaultConfig);
     Value -> Value
-  end.
+  end;
+get_config_value(_, _) -> undefined.
 
-get_config_value(Key, DefaultConfig, DefaultIfNotSet) ->
+get_config_value(Key, DefaultConfig, DefaultIfNotSet) when is_list(DefaultConfig)->
   case get_config_value(Key, DefaultConfig) of
     undefined -> DefaultIfNotSet;
     Value -> Value
-  end.
+  end;
+get_config_value(_, _, DefaultIfNotSet) -> DefaultIfNotSet.
 
 get_env(Key) when is_atom(Key) ->
   get_env(atom_to_list(Key));
@@ -199,9 +222,10 @@ get_env(Key) when is_binary(Key) ->
 get_env(Key) when is_list(Key) ->
   case os:getenv(string:to_upper(Key)) of
     false ->
-      case application:get_env(Key) of
+      case application:get_env(application:get_application(), list_to_atom(Key)) of
+        {ok, Val} when is_list(Val)-> list_to_binary(Val);
         {ok, Val} -> Val;
-        undefined -> undefined
+        _ -> undefined
       end;
     Value -> list_to_binary(Value)
   end;

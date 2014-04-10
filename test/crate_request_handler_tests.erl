@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 09. Apr 2014 6:45 PM
 %%%-------------------------------------------------------------------
--module(crate_request_handler_test).
+-module(crate_request_handler_tests).
 -author("mat").
 
 -include("crate_erlang.hrl").

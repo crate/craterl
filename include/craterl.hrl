@@ -20,4 +20,8 @@
 -define(DEFAULT_SERVER, <<"localhost:4200">>).
 
 -record(sql_response, {cols=[], rows=[], rowCount=?DEFAULT_ROWCOUNT, duration=?DEFAULT_DURATION, wallclock=?DEFAULT_WALLCLOCK, runtime=?DEFAULT_RUNTIME}).
+
+-record(sql_request, {stmt, args=[]}).
 -record(sql_error, {message=?DEFAULT_MESSAGE, code=?DEFAULT_CODE}).
+
+-record(blob_request, {method, table, digest, data=[]}).

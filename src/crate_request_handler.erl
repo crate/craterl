@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4]).
+-export([start_link/3]).
 -ifdef(TEST).
 -compile(export_all).
 -endif.
@@ -26,13 +26,13 @@
   terminate/2,
   code_change/3]).
 
--include("crate_erlang.hrl").
+-include("craterl.hrl").
 -compile([{parse_transform, lager_transform}]).
 
 
 -define(SERVER, ?MODULE).
 
--record(state, {stmt, args, serverSpec, callerPid}).
+-record(state, {request, serverSpec, callerPid}).
 
 %%%===================================================================
 %%% API
@@ -44,10 +44,13 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link(_Stmt, _Args, _ServerSpec, _CallerPid) ->
+
+-spec(start_link(Request :: #sql_request{} | #blob_request{}, _ServerSpec, _CallerPid) ->
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link(Stmt, Args, ServerSpec, CallerPid) ->
-  gen_server:start_link(?MODULE, [Stmt, Args, ServerSpec, CallerPid], []).
+start_link(SqlRequest = #sql_request{}, ServerSpec, CallerPid) ->
+  gen_server:start_link(?MODULE, [SqlRequest, ServerSpec, CallerPid], []);
+start_link(BlobRequest = #blob_request{}, ServerSpec, CallerPid) ->
+  gen_server:start_link(?MODULE, [BlobRequest, ServerSpec, CallerPid], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -67,9 +70,9 @@ start_link(Stmt, Args, ServerSpec, CallerPid) ->
 -spec(init(Args :: term()) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init([Stmt, Args, ServerSpec, CallerPid]) ->
+init([Request, ServerSpec, CallerPid]) ->
   self() ! {do_start},
-  {ok, #state{stmt=Stmt, args=Args, serverSpec = ServerSpec, callerPid = CallerPid}}.
+  {ok, #state{request=Request, serverSpec = ServerSpec, callerPid = CallerPid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -118,8 +121,12 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_info({do_start}, State=#state{}) ->
-  do_request(State),
+handle_info({do_start}, State=#state{request =  #sql_request{}}) ->
+  sql_request(State),
+  {stop, normal, State};
+handle_info({do_start}, State=#state{request = #blob_request{}}) ->
+  blob_request(State),
+  %% TODO: continue somehow? further requests for chunking?
   {stop, normal, State};
 handle_info(_Info, State) ->
   {noreply, State}.
@@ -158,9 +165,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-do_request(#state{stmt=Stmt, args=Args, serverSpec=ServerSpec, callerPid=CallerPid}) ->
-  Response = case hackney:request(<<"POST">>,
-    create_server_url(ServerSpec),
+
+%%% SQL %%%
+
+sql_request(#state{request=#sql_request{stmt=Stmt, args=Args}, serverSpec=ServerSpec, callerPid=CallerPid}) ->
+  Response = case hackney:request(post,
+    create_server_url(ServerSpec, ?SQLPATH),
     [{<<"Content-Type">>, <<"application/json">>}],
     create_payload(Stmt, Args),
     [{pool, crate}]
@@ -194,20 +204,24 @@ normalize_server_url(<<"http://", _/binary>>=Server) -> Server;
 normalize_server_url(<<"https://", _/binary>>=Server) -> Server;
 normalize_server_url(<<Server/binary>>) -> <<"http://", Server/binary>>.
 
-create_server_url(<<_Host, ":", _Port>> = HostAndPort) ->
-  normalize_server_url(<<HostAndPort, ?SQLPATH/binary>>);
-create_server_url(Host) when is_binary(Host) ->
+create_server_url(<<"http://", Host/binary>>, Path) when is_binary(Path) ->
+  create_server_url(http, Host, Path);
+create_server_url(<<"https://", Host/binary>>, Path) when is_binary(Path) ->
+  create_server_url(https, Host, Path);
+create_server_url(Host, Path) when is_binary(Host) and is_binary(Path) ->
+  create_server_url(http, Host, Path).
+
+create_server_url(Scheme, Host, Path) when is_atom(Scheme) and is_binary(Host) and is_binary(Path) ->
   Url = case binary:split(Host, <<":">>) of
     [_, _] ->
-      <<Host/binary, ?SQLPATH/binary>>;
+      <<Host/binary, Path/binary>>;
     [HostString] ->
+      SchemeString = atom_to_binary(Scheme, utf8),
       PortString = integer_to_binary(?DEFAULT_PORT),
-      <<HostString, ":", PortString, ?SQLPATH/binary>>
+      <<SchemeString/binary, "://", HostString/binary, ":", PortString/binary, Path/binary>>
   end,
   normalize_server_url(Url);
-create_server_url(HostStr) when is_list(HostStr) ->
-  create_server_url(list_to_binary(HostStr)).
-
+create_server_url(_, _, _) -> {error, invalid_server}.
 
 build_response(Body) when is_binary(Body) ->
   % TODO: handle incomplete input
@@ -227,3 +241,50 @@ build_error_response(Body) when is_binary(Body) ->
     code=proplists:get_value(<<"code">>, ErrorInfo, ?DEFAULT_CODE),
     message=proplists:get_value(<<"message">>, ErrorInfo, ?DEFAULT_MESSAGE)
   }.
+
+%%% BLOB %%%
+
+blob_request(#state{
+  request = #blob_request{method=Method, table=Table, digest=Digest, data=Data},
+  serverSpec = ServerSpec,
+  callerPid = CallerPid}) ->
+  case Method of
+    %get -> blob_get(ServerSpec, Table, Digest, CallerPid);
+    put -> blob_put(ServerSpec, Table, Digest, Data, CallerPid);
+    %delete -> blob_delete(ServerSpec, Table, Digest, CallerPid);
+    _ -> CallerPid ! {self(), unsupported}
+  end.
+
+blob_put(ServerSpec, Table, Digest, Data, CallerPid) when is_binary(Table) and is_binary(Digest) ->
+  case create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>) of
+    {error, Reason} -> {error, Reason};
+    Url ->
+      lager:info("putting blob to ~p", [Url]),
+      Response = case hackney:request(put,
+        Url,
+        [
+          {<<"Transfer-Encoding">>, <<"chunked">>}
+        ],
+        stream,
+        [{pool, crate}]
+      ) of
+        {ok, Client} ->
+          case hackney:send_body(Client, Data) of
+            ok ->
+              case hackney:start_response(Client) of
+                {ok, StatusCode, _RespHeaders, _ClientRef} ->
+                   case StatusCode of
+                     201 -> {ok, created, Digest};
+                     400 -> {error, bad_request, Digest};
+                     404 -> {error, blob_table_not_found, Table};
+                     409 -> {error, already_exists, Digest};
+                     _ -> {error, StatusCode}
+                   end;
+                {error, Reason} ->
+                  {error, Reason}
+              end;
+            {error, Reason} -> {error, Reason}
+          end
+      end,
+      CallerPid ! {self(), Response}
+  end.

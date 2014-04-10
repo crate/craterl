@@ -10,15 +10,14 @@
 -author("mat").
 
 -behaviour(supervisor).
-
+-include("craterl.hrl").
 %% API
--export([start_link/0, request/4]).
+-export([start_link/0, request/3]).
 
 %% Supervisor callbacks
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
-
 %%%===================================================================
 %%% API functions
 %%%===================================================================
@@ -34,16 +33,13 @@
 start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
--spec request(Stmt, Args, ServerSpec, CallerPid) -> Result when
-  Stmt :: binary(),
-  Args :: list(),
+-spec request(Request, ServerSpec, CallerPid) -> Result when
+  Request :: #sql_request{} | #blob_request{} ,
   ServerSpec :: string() | binary(),
   CallerPid :: pid(),
   Result :: {ok, ChildPid :: pid()} | {error, Err :: term()}.
-request(Stmt, Args, ServerSpec, CallerPid) when is_binary(Stmt)
-                                            and is_list(Args)
-                                            and is_pid(CallerPid) ->
-  case supervisor:start_child(?MODULE, [Stmt, Args, ServerSpec, CallerPid]) of
+request(Request, ServerSpec, CallerPid) when is_pid(CallerPid) ->
+  case supervisor:start_child(?MODULE, [Request, ServerSpec, CallerPid]) of
     {ok, ChildPid} -> {ok, ChildPid};
     {ok, ChildPid, _} -> {ok, ChildPid};
     {error, Err} -> {error, Err}

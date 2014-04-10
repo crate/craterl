@@ -9,7 +9,7 @@
 -module(crate_request_handler_tests).
 -author("mat").
 
--include("crate_erlang.hrl").
+-include("craterl.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 simple_test() ->
@@ -18,9 +18,9 @@ simple_test() ->
 server_uri_from_spec_test() ->
   ?assertEqual(
     <<"http://localhost:4200/_sql">>,
-    crate_request_handler:create_server_url(<<"localhost:4200">>)),
-  ?assertEqual(<<"http://bla:123/_sql">>, crate_request_handler:create_server_url(<<"http://bla:123">>)),
-  ?assertEqual(<<"https://secure:22/_sql">>, crate_request_handler:create_server_url(<<"https://secure:22">>))
+    crate_request_handler:create_server_url(<<"localhost:4200">>, <<"/_sql">>)),
+  ?assertEqual(<<"http://bla:123/_sql">>, crate_request_handler:create_server_url(<<"http://bla:123">>, <<"/_sql">>)),
+  ?assertEqual(<<"https://secure:4200/_sql">>, crate_request_handler:create_server_url(<<"https://secure">>, <<"/_sql">>))
 .
 
 create_payload_test() ->

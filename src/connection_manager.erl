@@ -10,8 +10,11 @@
 
 -behaviour(gen_server).
 
+-include("crate_erlang.hrl").
+-compile([{parse_transform, lager_transform}]).
+
 %% API
--export([start_link/1, get_server/0, add_active/1, add_inactive/1]).
+-export([start_link/0, get_server/0, add_active/1, add_inactive/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -29,11 +32,11 @@
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
+%% @spec start_link(Args) -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link(Servers) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, Servers, []).
+start_link() ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 get_server() ->
     gen_server:call(?MODULE, getserver).
@@ -59,9 +62,11 @@ add_inactive(Server) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init(Servers) ->
-    {ok, #connections{activelist=normalize_servers(Servers),
-                      inactivelist=queue:new()}}.
+init(_) ->
+    Servers = config_provider:get(crate_servers, [?DEFAULT_SERVER]),
+    lager:info("Servers configured ~p", [Servers]),
+    {ok, #connections{activelist=Servers,
+                      inactivelist=[]}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -81,28 +86,26 @@ handle_call(getserver, _From,
             #connections{activelist=Active, 
                          inactivelist=Inactive}) ->
     io:format("getserver start ~p, ~p ~n", [Active, Inactive]),
-    case lookup(Active, Inactive) of
-        none_active -> 
-            {reply, none_active, 
-             #connections{activelist=Active, inactivelist=Inactive}};
-        {ok, Server, Active1, Inactive1} ->
-            {reply, {ok, Server}, 
-             #connections{activelist=Active1, inactivelist=Inactive1}}
-    end;
-    
-handle_call({add_active, Server}, _From, 
-            #connections{activelist=Active, 
+    Response = case lookup(Active, Inactive) of
+        none_active -> none_active;
+        Server      -> {ok, Server}
+    end,
+    {reply, Response, #connections{activelist=Active, inactivelist=Inactive}};
+
+handle_call({add_active, Server}, _From,
+            #connections{activelist=Active,
                          inactivelist=Inactive}) ->
     io:format("getserver active ~p; ~p, ~p ~n", [Server, Active, Inactive]),
-    {reply, ok, #connections{activelist=queue:in(Server, Active), 
+    {reply, ok, #connections{activelist=[Server|Active],
                              inactivelist=Inactive}};
 
 handle_call({add_inactive, Server}, _From, 
             #connections{activelist=Active, 
                          inactivelist=Inactive}) ->
     io:format("getserver inactive ~p; ~p, ~p ~n", [Server, Active, Inactive]),
-    {reply, ok, #connections{activelist=Active, 
-                             inactivelist=queue:in(Server, Inactive)}};
+    lists:delete(Server, Active),
+    {reply, ok, #connections{activelist=Active,
+                             inactivelist=[Server|Inactive]}};
 
 handle_call(Request, _From, State) ->
     lager:error("unexpected request ~p, state ~p", [Request, State]),
@@ -163,13 +166,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-normalize_servers(Servers) ->
-    queue:from_list(Servers).
-
-lookup(Active, Inactive) ->
-    case queue:out(Active) of 
-        {empty, _} ->
-            none_active; % xxx look up inactive
-        {{value, Server}, Active1} ->
-            {ok, Server, Active1, Inactive}
-    end.
+lookup([], _Inactive) ->
+    none_active;
+lookup(Active, _Inactive) when is_list(Active)->
+    lists:last(Active).

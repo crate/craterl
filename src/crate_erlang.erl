@@ -8,6 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(crate_erlang).
 
+-include("crate_erlang.hrl").
 
 %% API
 -export([sql/1, sql/2, start/0]).
@@ -35,7 +36,7 @@ sql(Stmt, Args) ->
                     {ok, SqlResponse};
                 {ChildPid, {error, econnrefused}} ->
                     connection_manager:add_inactive(Server),
-                    sql(Stmt, Args);
+                    {error, no_connection};
                 {ChildPid, Other} ->
                     io:format("sql/other: ~p~n", [Other])
             end

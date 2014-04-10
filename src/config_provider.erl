@@ -4,19 +4,19 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created : 09. Apr 2014 1:25 PM
+%%% Created : 10. Apr 2014 10:20 AM
 %%%-------------------------------------------------------------------
--module(crate_request_handler).
+-module(config_provider).
 -author("mat").
 
 -behaviour(gen_server).
+-compile([{parse_transform, lager_transform}]).
 
 %% API
--export([start_link/4]).
--ifdef(TEST).
--compile(export_all).
--endif.
-
+-export([start_link/0,
+  get/1, get/2,
+  reload/0, reload/1
+]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -26,11 +26,9 @@
   terminate/2,
   code_change/3]).
 
--include("crate_erlang.hrl").
-
 -define(SERVER, ?MODULE).
 
--record(state, {stmt, args, serverSpec, callerPid}).
+-record(state, {config=[]}).
 
 %%%===================================================================
 %%% API
@@ -42,10 +40,19 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link(_Stmt, _Args, _ServerSpec, _CallerPid) ->
+-spec(start_link() ->
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link(Stmt, Args, ServerSpec, CallerPid) ->
-  gen_server:start_link(?MODULE, [Stmt, Args, ServerSpec, CallerPid], []).
+start_link() ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+
+get(Key) ->
+  gen_server:call(?SERVER, {get, Key}).
+get(Key, Default) ->
+  gen_server:call(?SERVER, {get, Key, Default}).
+
+reload() -> gen_server:cast(?SERVER, {reload}).
+reload(Path) -> gen_server:cast(?SERVER, {reload, Path}).
+
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -65,9 +72,10 @@ start_link(Stmt, Args, ServerSpec, CallerPid) ->
 -spec(init(Args :: term()) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init([Stmt, Args, ServerSpec, CallerPid]) ->
-  self() ! {do_start},
-  {ok, #state{stmt=Stmt, args=Args, serverSpec = ServerSpec, callerPid = CallerPid}}.
+init([]) ->
+  Config = load_config(),
+  lager:debug("Starting with config ~p", [Config]),
+  {ok, #state{config = Config}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -84,9 +92,14 @@ init([Stmt, Args, ServerSpec, CallerPid]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
+handle_call({get, Key}, _From, State) ->
+  Value = get_config_value(Key, State#state.config),
+  {reply, Value, State};
+handle_call({get, Key, Default}, _From, State) ->
+  Value = get_config_value(Key, State#state.config, Default),
+  {reply, Value, State};
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
-
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -98,9 +111,12 @@ handle_call(_Request, _From, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
+handle_cast({reload}, _State) ->
+  {noreply, load_config()};
+handle_cast({reload, Path}, _State) ->
+  {noreply, load_config(Path)};
 handle_cast(_Request, State) ->
   {noreply, State}.
-
 
 %%--------------------------------------------------------------------
 %% @private
@@ -116,9 +132,6 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_info({do_start}, State=#state{}) ->
-  do_request(State),
-  {stop, normal, State};
 handle_info(_Info, State) ->
   {noreply, State}.
 
@@ -155,63 +168,41 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+load_config() ->
+  ConfigFilePath = get_env(crate_config_file),
+  load_config(ConfigFilePath).
 
-do_request(#state{stmt=Stmt, args=Args, serverSpec=ServerSpec, callerPid=CallerPid}) ->
-  Response = case hackney:request(<<"POST">>,
-    create_server_url(ServerSpec),
-    [{<<"Content-Type">>, <<"application/json">>}],
-    create_payload(Stmt, Args),
-    [{pool, crate}]
-  ) of
-    {ok, StatusCode, _RespHeaders, ClientRef} ->
-       % parse body
-       case hackney:body(ClientRef) of
-         {ok, Body} ->
-           case StatusCode of
-             StatusCode when StatusCode < 400 ->
-               {ok, build_response(Body)};
-             _ErrorCode ->
-               {error, build_error_response(Body)}
-           end;
-         {error, Reason} -> {error, Reason}
-       end;
-    {error, Reason} ->
-      {error, Reason}
-  end,
-  CallerPid ! {self(), Response}.
+load_config(ConfigFilePath) ->
+  case file:consult(ConfigFilePath) of
+      {ok, Terms} -> Terms;
+      {error, Reason} ->
+        lager:error("Error reading config file ~p: ~p", [ConfigFilePath, Reason]),
+        []
+  end.
 
-create_payload(Stmt, Args) ->
-  Payload = [
-    {<<"stmt">>, Stmt},
-    {<<"args">>, Args}
-  ],
-  % TODO: handle incomplete input
-  jsx:encode(Payload).
+get_config_value(Key, DefaultConfig) ->
+  case get_env(Key) of
+    undefined -> proplists:get_value(Key, DefaultConfig);
+    Value -> Value
+  end.
 
-normalize_server_url(<<"http://", _/bitstring>>=Server) -> Server;
-normalize_server_url(<<"https://", _/bitstring>>=Server) -> Server;
-normalize_server_url(<<Server/bitstring>>) -> <<"http://", Server/bitstring>>.
+get_config_value(Key, DefaultConfig, DefaultIfNotSet) ->
+  case get_config_value(Key, DefaultConfig) of
+    undefined -> DefaultIfNotSet;
+    Value -> Value
+  end.
 
-create_server_url({Host, Port}) when is_binary(Host) and is_integer(Port) ->
-  PortString = integer_to_binary(Port),
-  normalize_server_url(<<Host/bitstring, ":", PortString/binary, ?SQLPATH>>).
-
-
-build_response(Body) when is_binary(Body) ->
-  % TODO: handle incomplete input
-  Decoded = jsx:decode(Body),
-  #sql_response{
-    rowCount=proplists:get_value(<<"rowcount">>, Decoded, 0),
-    cols=proplists:get_value(<<"cols">>, Decoded, []),
-    rows=proplists:get_value(<<"rows">>, Decoded, []),
-    duration=proplists:get_value(<<"duration">>, Decoded, 0)
-  }.
-
-build_error_response(Body) when is_binary(Body) ->
-  % TODO: handle incomplete input
-  Decoded = jsx:decode(Body),
-  ErrorInfo = proplists:get_value(<<"error">>, Decoded, []),
-  #sql_error{
-    code=proplists:get_value(<<"code">>, ErrorInfo, ?DEFAULT_CODE),
-    message=proplists:get_value(<<"message">>, ErrorInfo, ?DEFAULT_MESSAGE)
-  }.
+get_env(Key) when is_atom(Key) ->
+  get_env(atom_to_list(Key));
+get_env(Key) when is_binary(Key) ->
+  get_env(binary_to_list(Key));
+get_env(Key) when is_list(Key) ->
+  case os:getenv(string:to_upper(Key)) of
+    false ->
+      case application:get_env(Key) of
+        {ok, Val} -> Val;
+        undefined -> undefined
+      end;
+    Value -> Value
+  end;
+get_env(_) -> undefined.

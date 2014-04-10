@@ -3,4 +3,4 @@
 
 sql_select_simple_test() ->
     connection_manager:start_link([{<<"localhost">>, 4200}]),
-    {ok, Result} = crate_erlang:sql(<<"select * from craty">>).
+    {ok, _Result} = crate_erlang:sql(<<"select * from craty">>).

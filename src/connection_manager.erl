@@ -44,6 +44,9 @@ start_link() ->
 get_server() ->
     gen_server:call(?MODULE, getserver).
 
+set_servers(ServerList) when is_list(ServerList) ->
+    gen_server:call(?MODULE, {set_servers, ServerList}).
+
 add_active(Server) ->
     gen_server:call(?MODULE, {add_active, Server}).
 
@@ -116,6 +119,12 @@ handle_call(getserver, _From,
         none_active -> {reply, none_active, #connections{activelist=Active, inactivelist=Inactive}};
         {Server, NewActive} -> {reply, {ok, Server}, #connections{activelist=NewActive, inactivelist=Inactive}}
     end;
+
+handle_call({set_servers, ServerList}, _From, _State) ->
+    lager:info("set_servers "),
+    {reply, ok, #connections{activelist=ServerList,
+                             inactivelist=[]}};
+
 handle_call({add_active, Server}, _From,
             #connections{activelist=Active,
                          inactivelist=Inactive}) ->

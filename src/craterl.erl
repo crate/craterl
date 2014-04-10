@@ -11,7 +11,7 @@
 -include("crate_erlang.hrl").
 
 %% API
--export([sql/1, sql/2, start/0]).
+-export([sql/1, sql/2, start/0, set_servers/1]).
 
 -compile([{parse_transform, lager_transform}]).
 
@@ -21,6 +21,8 @@ start() ->
   application:ensure_all_started(lager),
   application:start(craterl).
 
+set_servers(Servers) ->
+    connection_manager:set_servers(Servers).
 
 sql(Stmt) ->
     sql(Stmt, []).

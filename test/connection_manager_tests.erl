@@ -32,6 +32,11 @@ connection_manager_inactive_test_() ->
     ?setup(fun inactive_server_test/1, fun start_multiple/0)
   }.
 
+connection_manager_set_server_test_() ->
+  {"test setting a list of active servers",
+    ?setup(fun set_server_test/1, fun start_single/0)
+  }.
+
 %%%%%%%%%%%%%
 %%% setup %%%
 %%%%%%%%%%%%%
@@ -92,3 +97,9 @@ parse_server_string_test_() ->
       connection_manager:parse_servers_string("localhost:123, host:456"),
       [<<"localhost:123">>, <<"host:456">>])
   ].
+
+set_server_test(_) ->
+    ok = connection_manager:set_servers([aserver]),
+    [
+     ?_assertEqual({ok, aserver}, connection_manager:get_server())
+    ].

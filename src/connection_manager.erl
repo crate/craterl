@@ -10,7 +10,7 @@
 
 -behaviour(gen_server).
 
--include("crate_erlang.hrl").
+-include("craterl.hrl").
 -compile([{parse_transform, lager_transform}]).
 
 %% API

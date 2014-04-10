@@ -36,8 +36,7 @@ simple_query_test(_) ->
 simple_query_test_str_params(_) ->
     [
      ?_assertMatch({ok, _},
-                   craterl:sql("select * from sys.cluster"
-                              ))
+                   craterl:sql("select * from sys.cluster"))
      
     ].
 

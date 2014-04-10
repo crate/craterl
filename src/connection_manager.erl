@@ -50,7 +50,7 @@ add_active(Server) ->
 add_inactive(Server) ->
     gen_server:call(?MODULE, {add_inactive, Server}).
 
-stop() -> gen_server:call(?MODULE, stop).
+stop() -> gen_server:cast(?MODULE, stop).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -68,6 +68,7 @@ stop() -> gen_server:call(?MODULE, stop).
 %% @end
 %%--------------------------------------------------------------------
 init(_) ->
+    random:seed(now()),
     Servers = parse_servers_string(config_provider:get(crate_servers, [?DEFAULT_SERVER])),
     lager:info("Servers configured ~p", [Servers]),
     {ok, #connections{activelist=Servers,
@@ -111,12 +112,10 @@ handle_call(getserver, _From,
             #connections{activelist=Active, 
                          inactivelist=Inactive}) ->
     io:format("getserver start ~p, ~p ~n", [Active, Inactive]),
-    Response = case lookup(Active, Inactive) of
-        none_active -> none_active;
-        Server      -> {ok, Server}
-    end,
-    {reply, Response, #connections{activelist=Active, inactivelist=Inactive}};
-
+    case lookup(Active, Inactive) of
+        none_active -> {reply, none_active, #connections{activelist=Active, inactivelist=Inactive}};
+        {Server, NewActive} -> {reply, {ok, Server}, #connections{activelist=NewActive, inactivelist=Inactive}}
+    end;
 handle_call({add_active, Server}, _From,
             #connections{activelist=Active,
                          inactivelist=Inactive}) ->
@@ -128,8 +127,8 @@ handle_call({add_inactive, Server}, _From,
             #connections{activelist=Active, 
                          inactivelist=Inactive}) ->
     io:format("getserver inactive ~p; ~p, ~p ~n", [Server, Active, Inactive]),
-    lists:delete(Server, Active),
-    {reply, ok, #connections{activelist=Active,
+    NewActive = lists:delete(Server, Active),
+    {reply, ok, #connections{activelist=NewActive,
                              inactivelist=[Server|Inactive]}};
 
 handle_call(Request, _From, State) ->
@@ -193,7 +192,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-lookup([], _Inactive) ->
-    none_active;
-lookup(Active, _Inactive) when is_list(Active)->
-    lists:last(Active).
+lookup([H|[]], _Inactive) -> {H, [H]};
+lookup([], _) -> none_active;
+lookup(Active, _Inactive) when is_list(Active) ->
+  [Server|Rest] = Active,
+  {Server, Rest ++ [Server]}.
+

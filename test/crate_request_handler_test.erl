@@ -29,7 +29,7 @@ create_payload_test() ->
 
 build_response_test() ->
   ?assertEqual(#sql_response{rows = [[1,2,3],[4,5,6]], cols=[<<"x">>, <<"y">>, <<"z">>], rowCount = 2, duration = 4},
-    crate_request_handler:build_response(<<"{\"rows\":[[1,2,3],[4,5,6]], \"cols\":[\"x\",\"y\",\"z\"], \"rowCount\":2, \"duration\":4}">>)
+    crate_request_handler:build_response(<<"{\"rows\":[[1,2,3],[4,5,6]], \"cols\":[\"x\",\"y\",\"z\"], \"rowcount\":2, \"duration\":4}">>)
   ),
   ?assertEqual(#sql_response{},
     crate_request_handler:build_response(<<"{\"some\":\"weird\", \"stuff\":1}">>)

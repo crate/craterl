@@ -1,6 +1,6 @@
 -module(craterl_tests).
 -include_lib("eunit/include/eunit.hrl").
-
+-include("craterl.hrl").
 -define(setup(F, Start), {setup, Start, fun stop/1, F}).
 
 
@@ -28,7 +28,7 @@ stop(_) ->
 
 simple_query_test(_) ->
     [
-     ?_assertMatch({ok, {sql_response, _Cols, _Rows, _RowCnt, _Dur, _Wall, _RunT}},
+     ?_assertMatch({ok, #sql_response{}},
                     craterl:sql(<<"select * from sys.cluster">>))
      
     ].

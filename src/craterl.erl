@@ -15,6 +15,7 @@
 %% API
 -export([sql/1, sql/2,
   set_servers/1,
+  blob_get/2, blob_get_to_file/3,
   blob_put/2, blob_put_file/2,
   start/0]).
 
@@ -39,27 +40,12 @@ sql(Stmt, Args) when is_list(Stmt) and is_list(Args) ->
 sql(Stmt, Args) when is_binary(Stmt) and is_list(Args) ->
     statistics(runtime),
     statistics(wall_clock),
-    case connection_manager:get_server() of
-        none_active ->
-            {error, "No active server"};
-        {ok, Server} ->
-            {ok, ChildPid} = crate_request_handler_sup:request(
-                               #sql_request{stmt=Stmt, args=Args}, Server, self()),
-            receive
-                {ChildPid, {ok, SqlResponse}} ->
-                    {ok, instrument(SqlResponse)};
-                {ChildPid, {error, econnrefused}} ->
-                    lager:info("sql/econnrefused: ~p~n", [Server]),
-                    connection_manager:add_inactive(Server),
-                    sql(Stmt, Args);
-                {ChildPid, {error, OtherError}} ->
-                    lager:info("sql/error other: ~p~n", [OtherError]),
-                    {error, OtherError};
-                Other ->
-                    lager:error("sql/other: ~p~n", [Other]),
-                    {error, Other}
-            end
-    end;
+    Request = #sql_request{stmt=Stmt, args=Args},
+    SuccessFun = fun
+      (SqlResponse = #sql_response{}) -> {ok, instrument(SqlResponse)};
+      (Response) -> {error, invalid_response, Response}
+    end,
+    request(Request, SuccessFun);
 sql(_, _) -> {error, unsupported}.
 
 instrument(#sql_response{
@@ -78,79 +64,77 @@ instrument(#sql_response{
        runtime=RunTime
       }.
 
-
-blob_put(BlobTable, Content) ->
-  % TODO: do not use file interface as it migth double used ram
-  case ramFileGetHashAndData(Content) of
-    {ok, HexDigest, FileData} ->
-      send_blob(BlobTable, HexDigest, FileData);
-    {error, Reason} -> {error, Reason}
-  end.
-
-blob_put_file(BlobTable, FilePath) ->
-  case fileGetHashAndData(FilePath) of
-    {ok, HexDigest, FileData} ->
-      send_blob(BlobTable, HexDigest, FileData);
-    {error, Reason} -> {error, Reason}
-  end.
-
-send_blob(BlobTable, HexDigest, FileData) ->
+request(Request, SuccessFun) when is_function(SuccessFun) ->
   case connection_manager:get_server() of
       none_active ->
           {error, "No active server"};
       {ok, Server} ->
-          {ok, ChildPid} = crate_request_handler_sup:request(
-                             #blob_request{
-                               method=put,
-                               table=BlobTable,
-                               digest=HexDigest,
-                               data=FileData},
-                             Server, self()),
-          receive
-              {ChildPid, {ok, created, Digest}} ->
-                  {ok, created, Digest};
-              {ChildPid, {error, econnrefused}} ->
-                  connection_manager:add_inactive(Server),
-                  send_blob(BlobTable, HexDigest, FileData);
-              {ChildPid, {error, Reason}} ->
-                {error, Reason};
-              {ChildPid, {error, Reason, Digest}} ->
-                {error, Reason, Digest};
-              {ChildPid, Other} ->
-                  io:format("blob/other: ~p~n", [Other])
-          end
+        case crate_request_handler_sup:request(Request, Server, self()) of
+          {ok, ChildPid} ->
+            receive
+                {ChildPid, {ok, Response}} ->
+                    SuccessFun(Response);
+                {ChildPid, {error, econnrefused}} ->
+                    lager:info("request/econnrefused: ~p~n", [Server]),
+                    connection_manager:add_inactive(Server),
+                    request(Request, SuccessFun);
+                {ChildPid, {error, OtherError}} ->
+                    lager:info("request/error: ~p~n", [OtherError]),
+                    {error, OtherError};
+                {ChildPid, Other} ->
+                    lager:error("request/other: ~p", [Other])
+            end;
+          {error, Reason} -> {error, Reason}
+        end
   end.
 
-%% hash binary Content as if it was a file
-ramFileGetHashAndData(Content) ->
-  case file:open(Content, [read, ram, binary]) of
-    {ok, FileHandle} ->
-      Ctx = crypto:hash_init(sha),
-      Result = hashOpenFile(FileHandle, Ctx, <<>>),
-      file:close(FileHandle),
-      Result;
+
+blob_get(BlobTable, HexDigest) ->
+  Request = #blob_request{
+               method=get,
+               table=BlobTable,
+               digest=HexDigest},
+  SuccessFun = fun
+    (Response) when is_binary(Response) -> io:format("~p~n", base64:encode(Response));
+    (Response) -> {error, invalid_response, Response}
+  end,
+  request(Request, SuccessFun).
+
+blob_get_to_file(BlobTable, HexDigest, FilePath) ->
+  Request = #blob_request{
+               method=get,
+               table=BlobTable,
+               digest=HexDigest,
+               payload={file, FilePath}},
+  SuccessFun = fun
+    (ResultFilePath) when is_binary(ResultFilePath) -> {ok, ResultFilePath};
+    (Response) -> {error, invalid_response, Response}
+  end,
+  request(Request, SuccessFun).
+
+blob_put(BlobTable, Content) ->
+  case craterl_hash:sha1Hex(Content) of
+    {ok, HexDigest} ->
+      send_blob(BlobTable, HexDigest, {data, Content});
     {error, Reason} -> {error, Reason}
   end.
 
-fileGetHashAndData(FilePath) ->
-  case file:open(FilePath, [read, raw, binary]) of
-    {ok, FileHandle} ->
-      Ctx = crypto:hash_init(sha),
-      Result = hashOpenFile(FileHandle, Ctx, <<>>),
-      file:close(FileHandle),
-      Result;
+blob_put_file(BlobTable, FilePath) ->
+  case craterl_hash:sha1HexFile(FilePath) of
+    {ok, HexDigest} ->
+      send_blob(BlobTable, HexDigest, {file, FilePath});
     {error, Reason} -> {error, Reason}
   end.
 
-hashOpenFile(FileHandle, HashCtx, DataAcc) when is_binary(DataAcc)->
-  case file:read(FileHandle, 4194304) of
-    {ok, Data} ->
-      NewHashCtx = crypto:hash_update(HashCtx, Data),
-      hashOpenFile(FileHandle, NewHashCtx, <<DataAcc/binary, Data/binary>>);
-    eof ->
-      Digest = crypto:hash_final(HashCtx),
-      {ok, bin_to_hex:hexstring(Digest), DataAcc};
-    {error, Reason} ->
-      {error, Reason}
-  end.
+send_blob(BlobTable, HexDigest, Payload) ->
+  Request = #blob_request{
+               method=put,
+               table=BlobTable,
+               digest=HexDigest,
+               payload=Payload},
+  SuccessFun = fun
+    ({created, Digest}) -> {ok, created, Digest};
+    (Response) -> {error, invalid_response, Response}
+  end,
+  request(Request, SuccessFun).
 

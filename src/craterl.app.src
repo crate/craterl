@@ -11,9 +11,16 @@
                   hackney,
                   lager
                  ]},
-  {mod, {craterl_app, []}},
+  {mod,
+    {craterl_app, []}
+  },
   {env, [
-    {crate_servers, ["localhost:4200"]}
+    {crate_servers, ["localhost:4200"]},
+    {handlers, [
+      {lager_console_backend, debug},
+      {lager_file_backend, [{file, "error.log"}, {level, error}]}
+    ]}
+
   ]}
  ]
 }.

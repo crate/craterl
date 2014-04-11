@@ -1,0 +1,14 @@
+===================
+CHANGES for craterl
+===================
+
+Unreleased
+==========
+
+ - support for downloading blobs, base64 encoded to stdout or to a file.
+   api is
+
+.. code-block:: erlang
+
+    craterl:blob_get(BlobTable, HexDigest).
+    craterl:blob_get_to_file(BlobTable, HexDigest, FilePath).

@@ -95,7 +95,8 @@ blob_get(BlobTable, HexDigest) ->
                table=BlobTable,
                digest=HexDigest},
   SuccessFun = fun
-    (Response) when is_binary(Response) -> io:format("~p~n", base64:encode(Response));
+    (GetDataFun) when is_function(GetDataFun) ->
+      {ok, GetDataFun};
     (Response) -> {error, invalid_response, Response}
   end,
   request(Request, SuccessFun).
@@ -106,6 +107,17 @@ blob_get_to_file(BlobTable, HexDigest, FilePath) ->
                table=BlobTable,
                digest=HexDigest,
                payload={file, FilePath}},
+  SuccessFun = fun
+    (ResultFilePath) when is_binary(ResultFilePath) -> {ok, ResultFilePath};
+    (Response) -> {error, invalid_response, Response}
+  end,
+  request(Request, SuccessFun).
+
+blob_exists(BlobTable, HexDigest) ->
+  Request = #blob_request{
+               method=head,
+               table=BlobTable,
+               digest=HexDigest},
   SuccessFun = fun
     (ResultFilePath) when is_binary(ResultFilePath) -> {ok, ResultFilePath};
     (Response) -> {error, invalid_response, Response}

@@ -241,6 +241,7 @@ build_error_response(Body) when is_binary(Body) ->
     message=proplists:get_value(<<"message">>, ErrorInfo, ?DEFAULT_MESSAGE)
   }.
 
+
 %%% BLOB %%%
 
 blob_request(#state{
@@ -253,9 +254,9 @@ blob_request(#state{
         undefined -> blob_get_to_mem(ServerSpec, Table, Digest);
         {file, FilePath} -> blob_get_to_file(ServerSpec, Table, Digest, FilePath)
       end;
-    % TODO: exists
+    head -> blob_exists(ServerSpec, Table, Digest);
     put -> blob_put(ServerSpec, Table, Digest, Payload);
-    %delete -> blob_delete(ServerSpec, Table, Digest, CallerPid);
+    delete -> blob_delete(ServerSpec, Table, Digest);
     _ -> {error, unsupported}
   end,
   CallerPid ! {self(), Response};
@@ -302,9 +303,12 @@ blob_put(ServerSpec, Table, Digest, Payload) when is_binary(Table) and is_binary
 
 blob_get_to_mem(ServerSpec, Table, Digest) ->
   HandleBodyFun = fun (ClientRef) ->
-    hackney:body(ClientRef)
+    GetDataFun = fun() ->
+      hackney:stream_body(ClientRef)
+    end,
+    GetDataFun
   end,
-  blob_get(ServerSpec, Table, Digest, HandleBodyFun).
+  blob_request(ServerSpec, get, Table, Digest, HandleBodyFun).
 
 blob_get_to_file(ServerSpec, Table, Digest, FilePath) ->
   HandleBodyFun = fun (ClientRef) ->
@@ -319,7 +323,7 @@ blob_get_to_file(ServerSpec, Table, Digest, FilePath) ->
         {error, Reason} -> {error, Reason}
       end
   end,
-  blob_get(ServerSpec, Table, Digest, HandleBodyFun).
+  blob_request(ServerSpec, get, Table, Digest, HandleBodyFun).
 
 stream_blob_to_file(ClientRef, FileHandle) ->
   case hackney:stream_body(ClientRef) of
@@ -330,14 +334,29 @@ stream_blob_to_file(ClientRef, FileHandle) ->
     {error, Reason} -> {error, Reason}
   end.
 
-blob_get(ServerSpec, Table, Digest, HandleBodyFun) when is_function(HandleBodyFun) ->
+blob_exists(ServerSpec, Table, Digest) ->
+  SuccessFun = fun (_ClientRef) ->
+    ok
+  end,
+  blob_request(ServerSpec, head, Table, Digest, SuccessFun).
+
+blob_delete(ServerSpec, Table, Digest) ->
+  SuccessFun = fun (_ClientRef) ->
+    ok
+  end,
+  blob_request(ServerSpec, delete, Table, Digest, SuccessFun).
+
+
+%% TODO: maybe rename to avoid ambiguity
+blob_request(ServerSpec, Method, Table, Digest, HandleBodyFun) when is_function(HandleBodyFun)
+                                                                and is_atom(Method) ->
   case create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>) of
     {error, Reason} -> {error, Reason};
     Url ->
-      lager:debug("getting blob from ~p", [Url]),
+      lager:debug("blob request to ~p", [Url]),
       Headers = [],
       Options = [{pool, crate}],
-      case hackney:request(get, Url, Headers, <<>>, Options) of
+      case hackney:request(Method, Url, Headers, <<>>, Options) of
         {ok, StatusCode, _RespHeaders, ClientRef} ->
           case StatusCode of
               Code when Code < 400 -> HandleBodyFun(ClientRef);

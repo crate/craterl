@@ -41,4 +41,4 @@ ok
 Tests
 -----
 
-Simply call ```rebar eunit skip_deps=true``` to run the tests for crate_erlang.
+Simply call ```priv/ci/run_tests.sh``` to run the tests for crate_erlang.

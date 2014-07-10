@@ -3,7 +3,7 @@ otp_release:
    - R16B03-1
 
 env:
-  - CRATE_VERSION="0.37.1"
+  - CRATE_VERSION="0.39.3"
 
 before-install:
   - sudo apt-get install wget

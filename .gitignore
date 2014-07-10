@@ -3,8 +3,8 @@
 /.idea/
 /deps/
 /log/
+/ct/logs/
 *.o
 *.beam
 *.plt
 erl_crash.dump
-/parts/

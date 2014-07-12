@@ -1,12 +1,14 @@
 crate-erlang
 ============
 
+https://travis-ci.org/crate/craterl.svg?branch=master
+
 Erlang client for crate.
 
 Compatibility
 -------------
 
-Tested with Erlang ``R16B03-1``.
+Tested with Erlang ``R16B03-1`` .
 
 Installation
 ------------
@@ -25,12 +27,12 @@ Get all the stuff on an erlang shell:
 erl -pa ebin deps/*/ebin
 ```
 
-Use library from erlang shell, for testing, debugging etc.:
+Use craterl from erlang shell, for testing, debugging etc.:
 
 ```
-1> crate_erlang:start()
+1> craterl:start()
 ok
-2> crate_erlang:sql(<<"select * from tweets where id=?">>, [42]).
+2> craterl:sql(<<"select * from tweets where id=?">>, [42]).
 {ok,{sql_response,[<<"created_at">>,<<"id">>,
                   <<"retweeted">>,<<"source">>,<<"text">>,<<"user">>],
                   [[1397001600000,<<"42">>,null,null,<<"hello world">>,
@@ -41,4 +43,4 @@ ok
 Tests
 -----
 
-Simply call ```priv/ci/run_tests.sh``` to run the tests for crate_erlang.
+Simply call ```priv/ci/run_tests.sh``` to run the tests for craterl.

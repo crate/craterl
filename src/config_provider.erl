@@ -191,7 +191,7 @@ load_config(ConfigFilePath) ->
           end,
           Terms);
       {error, Reason} ->
-        lager:error("Error reading config file ~p: ~p", [ConfigFilePath, Reason]),
+        lager:debug("Error reading config file ~p: ~p", [ConfigFilePath, Reason]),
         []
   end.
 

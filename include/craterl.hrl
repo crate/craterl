@@ -24,4 +24,4 @@
 -record(sql_request, {stmt, args=[]}).
 -record(sql_error, {message=?DEFAULT_MESSAGE, code=?DEFAULT_CODE}).
 
--record(blob_request, {method, table, digest, data=[]}).
+-record(blob_request, {method, table, digest, payload=undefined}).

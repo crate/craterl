@@ -14,7 +14,9 @@
 -compile([{parse_transform, lager_transform}]).
 
 %% API
--export([start_link/0, stop/0, get_server/0, add_active/1, add_inactive/1]).
+-export([start_link/0, stop/0,
+  get_server/0, set_servers/1,
+  add_active/1, add_inactive/1]).
 -ifdef(TEST).
 -compile(export_all).
 -endif.

@@ -121,12 +121,11 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_info({do_start}, State=#state{request =  #sql_request{}}) ->
+handle_info({do_start}, State=#state{request = #sql_request{}}) ->
   sql_request(State),
   {stop, normal, State};
 handle_info({do_start}, State=#state{request = #blob_request{}}) ->
   blob_request(State),
-  %% TODO: continue somehow? further requests for chunking?
   {stop, normal, State};
 handle_info(_Info, State) ->
   {noreply, State}.
@@ -242,25 +241,33 @@ build_error_response(Body) when is_binary(Body) ->
     message=proplists:get_value(<<"message">>, ErrorInfo, ?DEFAULT_MESSAGE)
   }.
 
+
 %%% BLOB %%%
 
 blob_request(#state{
-  request = #blob_request{method=Method, table=Table, digest=Digest, data=Data},
+  request = #blob_request{method=Method, table=Table, digest=Digest, payload=Payload},
   serverSpec = ServerSpec,
   callerPid = CallerPid}) ->
-  case Method of
-    %get -> blob_get(ServerSpec, Table, Digest, CallerPid);
-    put -> blob_put(ServerSpec, Table, Digest, Data, CallerPid);
-    %delete -> blob_delete(ServerSpec, Table, Digest, CallerPid);
-    _ -> CallerPid ! {self(), unsupported}
-  end.
+  Response = case Method of
+    get ->
+      case Payload of
+        undefined -> blob_get_to_mem(ServerSpec, Table, Digest);
+        {file, FilePath} -> blob_get_to_file(ServerSpec, Table, Digest, FilePath)
+      end;
+    head -> blob_exists(ServerSpec, Table, Digest);
+    put -> blob_put(ServerSpec, Table, Digest, Payload);
+    delete -> blob_delete(ServerSpec, Table, Digest);
+    _ -> {error, unsupported}
+  end,
+  CallerPid ! {self(), Response};
+blob_request(_) -> {error, unsupported}.
 
-blob_put(ServerSpec, Table, Digest, Data, CallerPid) when is_binary(Table) and is_binary(Digest) ->
+blob_put(ServerSpec, Table, Digest, Payload) when is_binary(Table) and is_binary(Digest) ->
   case create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>) of
     {error, Reason} -> {error, Reason};
     Url ->
-      lager:info("putting blob to ~p", [Url]),
-      Response = case hackney:request(put,
+      lager:debug("putting blob to ~p", [Url]),
+      case hackney:request(put,
         Url,
         [
           {<<"Transfer-Encoding">>, <<"chunked">>}
@@ -269,22 +276,92 @@ blob_put(ServerSpec, Table, Digest, Data, CallerPid) when is_binary(Table) and i
         [{pool, crate}]
       ) of
         {ok, Client} ->
-          case hackney:send_body(Client, Data) of
+          Body = case Payload of
+            {file, Path} -> {file, Path};
+            {data, Data} -> Data;
+            Data -> Data
+          end,
+          case hackney:send_body(Client, Body) of
             ok ->
               case hackney:start_response(Client) of
                 {ok, StatusCode, _RespHeaders, _ClientRef} ->
                    case StatusCode of
-                     201 -> {ok, created, Digest};
-                     400 -> {error, bad_request, Digest};
-                     404 -> {error, blob_table_not_found, Table};
-                     409 -> {error, already_exists, Digest};
+                     201 -> {ok, {created, Digest}};
+                     400 -> {error, {bad_request, Digest}};
+                     404 -> {error, {not_found, Digest}};
+                     409 -> {error, {already_exists, Digest}};
                      _ -> {error, StatusCode}
                    end;
                 {error, Reason} ->
                   {error, Reason}
               end;
             {error, Reason} -> {error, Reason}
-          end
-      end,
-      CallerPid ! {self(), Response}
+          end;
+          {error, Reason} -> {error, Reason}
+      end
+  end.
+
+blob_get_to_mem(ServerSpec, Table, Digest) ->
+  HandleBodyFun = fun (ClientRef) ->
+    GetDataFun = fun() ->
+      hackney:stream_body(ClientRef)
+    end,
+    GetDataFun
+  end,
+  blob_request(ServerSpec, get, Table, Digest, HandleBodyFun).
+
+blob_get_to_file(ServerSpec, Table, Digest, FilePath) ->
+  HandleBodyFun = fun (ClientRef) ->
+      case file:open(FilePath, [write, binary, raw]) of
+        {ok, FileHandle} ->
+          Result = case stream_blob_to_file(ClientRef, FileHandle) of
+            ok -> {ok, FilePath};
+            {error, Reason} -> {error, Reason}
+          end,
+          file:close(FileHandle),
+          Result;
+        {error, Reason} -> {error, Reason}
+      end
+  end,
+  blob_request(ServerSpec, get, Table, Digest, HandleBodyFun).
+
+stream_blob_to_file(ClientRef, FileHandle) ->
+  case hackney:stream_body(ClientRef) of
+    {ok, Data} ->
+      file:write(FileHandle, Data),
+      stream_blob_to_file(ClientRef, FileHandle);
+    done -> ok;
+    {error, Reason} -> {error, Reason}
+  end.
+
+blob_exists(ServerSpec, Table, Digest) ->
+  SuccessFun = fun (_ClientRef) ->
+    ok
+  end,
+  blob_request(ServerSpec, head, Table, Digest, SuccessFun).
+
+blob_delete(ServerSpec, Table, Digest) ->
+  SuccessFun = fun (_ClientRef) ->
+    ok
+  end,
+  blob_request(ServerSpec, delete, Table, Digest, SuccessFun).
+
+
+%% TODO: maybe rename to avoid ambiguity
+blob_request(ServerSpec, Method, Table, Digest, HandleBodyFun) when is_function(HandleBodyFun)
+                                                                and is_atom(Method) ->
+  case create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>) of
+    {error, Reason} -> {error, Reason};
+    Url ->
+      lager:debug("blob request to ~p", [Url]),
+      Headers = [],
+      Options = [{pool, crate}],
+      case hackney:request(Method, Url, Headers, <<>>, Options) of
+        {ok, StatusCode, _RespHeaders, ClientRef} ->
+          case StatusCode of
+              Code when Code < 400 -> HandleBodyFun(ClientRef);
+              _ -> {error, StatusCode}
+          end;
+        {error, Reason} -> {error, Reason}
+      end
   end.

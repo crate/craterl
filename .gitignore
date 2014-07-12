@@ -3,6 +3,7 @@
 /.idea/
 /deps/
 /log/
+/ct/logs/
 *.o
 *.beam
 *.plt

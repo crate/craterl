@@ -21,7 +21,7 @@
 
 start() ->
   application:ensure_all_started(jsx),
-  application:ensure_all_started(hackney),
+  hackney:start(),
   application:ensure_all_started(lager),
   application:start(craterl).
 

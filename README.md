@@ -1,7 +1,8 @@
-crate-erlang
-============
+Craterl
+=======
 
 [![Build Status](https://travis-ci.org/crate/craterl.svg?branch=master)](https://travis-ci.org/crate/craterl)
+[![Awesomeness](http://img.shields.io/badge/awesome-indeed-green.svg)]
 
 Erlang client for crate.
 

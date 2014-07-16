@@ -17,6 +17,7 @@
   set_servers/1,
   blob_get/2, blob_get_to_file/3,
   blob_put/2, blob_put_file/2,
+  blob_exists/2,
   start/0]).
 
 start() ->
@@ -38,31 +39,14 @@ sql(Stmt, Args) when is_list(Stmt) and is_list(Args) ->
     sql(list_to_binary(Stmt), Args);
 
 sql(Stmt, Args) when is_binary(Stmt) and is_list(Args) ->
-    statistics(runtime),
-    statistics(wall_clock),
     Request = #sql_request{stmt=Stmt, args=Args},
     SuccessFun = fun
-      (SqlResponse = #sql_response{}) -> {ok, instrument(SqlResponse)};
+      (SqlResponse = #sql_response{}) -> {ok, SqlResponse};
       (Response) -> {error, invalid_response, Response}
     end,
     request(Request, SuccessFun);
 sql(_, _) -> {error, unsupported}.
 
-instrument(#sql_response{
-              cols=Cols, rows=Rows,
-              rowCount=RowCnt,
-              duration=Duration,
-              wallclock=_, runtime=_
-             }) ->   
-    {_, RunTime} = statistics(runtime),
-    {_, WallClock} = statistics(wall_clock),
-    #sql_response{
-       cols=Cols, rows=Rows, 
-       rowCount=RowCnt, 
-       duration=Duration,
-       wallclock=WallClock,
-       runtime=RunTime
-      }.
 
 request(Request, SuccessFun) when is_function(SuccessFun) ->
   case connection_manager:get_server() of

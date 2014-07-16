@@ -1,5 +1,5 @@
 /ebin/
-.eunit
+/.eunit/
 /.idea/
 /deps/
 /log/

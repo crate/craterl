@@ -64,8 +64,7 @@ request(Request, ServerSpec, CallerPid) when is_pid(CallerPid) ->
     MaxR :: non_neg_integer(), MaxT :: non_neg_integer()},
     [ChildSpec :: supervisor:child_spec()]
   }} |
-  ignore |
-  {error, Reason :: term()}).
+  ignore).
 init([]) ->
   RestartStrategy = simple_one_for_one,
   MaxRestarts = 2,

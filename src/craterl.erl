@@ -111,8 +111,7 @@ blob_exists(BlobTable, HexDigest) ->
 blob_put(BlobTable, Content) ->
   case craterl_hash:sha1Hex(Content) of
     {ok, HexDigest} ->
-      send_blob(BlobTable, HexDigest, {data, Content});
-    {error, Reason} -> {error, Reason}
+      send_blob(BlobTable, HexDigest, {data, Content})
   end.
 
 blob_put_file(BlobTable, FilePath) ->

@@ -259,8 +259,7 @@ blob_request(#state{
     delete -> blob_delete(ServerSpec, Table, Digest);
     _ -> {error, unsupported}
   end,
-  CallerPid ! {self(), Response};
-blob_request(_) -> {error, unsupported}.
+  CallerPid ! {self(), Response}.
 
 blob_put(ServerSpec, Table, Digest, Payload) when is_binary(Table) and is_binary(Digest) ->
   case create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>) of

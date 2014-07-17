@@ -27,7 +27,7 @@ hashContent(Ctx, Content, Rest) ->
     Bytes =< 4194304 -> %% TODO: find optimal chunk size
       hashContent(NewCtx, Rest, <<>>);
     true ->
-      <<Chunk:Bytes, NewRest/binary>> = Content,
+      <<Chunk:Bytes/binary, NewRest/binary>> = Content,
       hashContent(NewCtx, Chunk, NewRest)
   end.
 

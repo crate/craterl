@@ -28,11 +28,17 @@ then
     cd -
 fi
 
+make clean get-deps compile || exit 1
+
+echo "running eunit..."
+make eunit || exit 1
+
+echo "running common test..."
 echo "starting crate ..."
 ${TMP_DIR}/crate/bin/crate -Des.network.bind_host=127.0.0.1 -d -p ${TMP_DIR}/crate.pid || exit 1
 sleep 10
 curl -XPOST localhost:4200/_sql -d'{"stmt":"select * from sys.cluster"}' 2&> /dev/null
-chmod u+x $PWD/rebar && $PWD/rebar clean get-deps compile && $PWD/rebar skip_deps=true eunit && $PWD/rebar skip_deps=true ct || exit 1
+make ct || exit 1
 RETVAL=$?
 
 exit $RETVAL

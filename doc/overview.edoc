@@ -15,6 +15,7 @@
 %%==============================================================================
 
 @author Matthias Wahl <matthias@crate.io>
+@author Peter Sabaini <peter@sabaini.at>
 @copyright 2014, crate.io
 @version 0.0.1
 @title craterl, a client library for Crate

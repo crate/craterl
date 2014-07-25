@@ -1,10 +1,26 @@
 %%%-------------------------------------------------------------------
-%%% @author mat
-%%% @copyright (C) 2014, <COMPANY>
+%%% @copyright (C) 2014, CRATE Technology GmbH
+%%% Licensed to CRATE Technology GmbH ("Crate") under one or more contributor
+%%% license agreements.  See the NOTICE file distributed with this work for
+%%% additional information regarding copyright ownership.  Crate licenses
+%%% this file to you under the Apache License, Version 2.0 (the "License");
+%%% you may not use this file except in compliance with the License.  You may
+%%% obtain a copy of the License at
+%%%
+%%%     http://www.apache.org/licenses/LICENSE-2.0
+%%%
+%%% Unless required by applicable law or agreed to in writing, software
+%%% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+%%% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+%%% License for the specific language governing permissions and limitations
+%%% under the License.
+%%%
+%%% However, if you have executed another commercial license agreement
+%%% with Crate these terms will supersede the license and you may use the
+%%% software solely pursuant to the terms of the relevant commercial agreement.
 %%% @doc
 %%%
 %%% @end
-%%% Created : 09. Apr 2014 11:51 AM
 %%%-------------------------------------------------------------------
 -module(crate_request_handler_sup).
 -author("mat").
@@ -40,9 +56,8 @@ start_link() ->
   Result :: {ok, ChildPid :: pid()} | {error, Err :: term()}.
 request(Request, ServerSpec, CallerPid) when is_pid(CallerPid) ->
   case supervisor:start_child(?MODULE, [Request, ServerSpec, CallerPid]) of
-    {ok, ChildPid} -> {ok, ChildPid};
     {ok, ChildPid, _} -> {ok, ChildPid};
-    {error, Err} -> {error, Err}
+    Other -> Other
   end.
 
 %%%===================================================================

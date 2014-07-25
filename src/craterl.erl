@@ -6,6 +6,8 @@
 %%% @end
 %%% Created :  9 Apr 2014 by Peter Sabaini <peter@sabaini.at>
 %%%-------------------------------------------------------------------
+
+
 -module(craterl).
 
 -include("craterl.hrl").
@@ -14,7 +16,6 @@
 
 %% API
 -export([sql/1, sql/2,
-  set_servers/1,
   blob_get/2, blob_get_to_file/3,
   blob_put/2, blob_put_file/2,
   blob_exists/2,
@@ -22,12 +23,10 @@
 
 start() ->
   application:ensure_all_started(jsx),
-  hackney:start(),
+  application:ensure_all_started(hackney),
   application:ensure_all_started(lager),
   application:start(craterl).
 
-set_servers(Servers) ->
-    connection_manager:set_servers(Servers).
 
 sql(Stmt) when is_binary(Stmt) ->
     sql(Stmt, []);
@@ -67,8 +66,7 @@ request(Request, SuccessFun) when is_function(SuccessFun) ->
                     {error, OtherError};
                 {ChildPid, Other} ->
                     lager:error("request/other: ~p", [Other])
-            end;
-          {error, Reason} -> {error, Reason}
+            end
         end
   end.
 

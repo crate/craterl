@@ -2,11 +2,9 @@ language: erlang
 otp_release:
   - R16B03-1
 
-env:
-  - CRATE_VERSION="0.39.3"
-
 before-install:
   - sudo apt-get install wget curl
-
+install:
+    make .concrete/DEV_MODE compile
 script:
   - ./priv/ci/run_tests.sh

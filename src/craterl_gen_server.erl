@@ -22,7 +22,7 @@
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
--module(connection_manager).
+-module(craterl_gen_server).
 
 -behaviour(gen_server).
 
@@ -30,9 +30,9 @@
 -compile([{parse_transform, lager_transform}]).
 
 %% API
--export([start_link/0, stop/0,
-  get_server/0, set_servers/1,
-  add_active/1, add_inactive/1]).
+-export([start_link/3, stop/1,
+  get_server/1, set_servers/2,
+  add_active/2, add_inactive/2]).
 -ifdef(TEST).
 -compile(export_all).
 -endif.
@@ -41,9 +41,20 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--define(SERVER, ?MODULE).
+-define(DEFAULT_POOLNAME, crate).
+-define(DEFAULT_POOLSIZE, 20).
+-define(DEFAULT_TIMEOUT, 60000).
 
--record(connections, {activelist, inactivelist}).
+-record(connections, {
+  activelist   :: [ craterl_server_spec() ],
+  inactivelist :: [ craterl_server_spec() ]
+}).
+-record(state, {
+  connections = #connections{},
+  poolname :: atom(),
+  poolsize :: non_neg_integer(),
+  timeout :: non_neg_integer()
+}).
 
 %%%===================================================================
 %%% API
@@ -56,22 +67,25 @@
 %% @spec start_link(Args) -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-get_server() ->
-    gen_server:call(?MODULE, getserver).
+start_link(ClientSpec, Servers, Options) ->
+  gen_server:start_link(ClientSpec, ?MODULE, [{servers, Servers}, {options, Options}], []).
 
-set_servers(ServerList) when is_list(ServerList) ->
-    gen_server:call(?MODULE, {set_servers, ServerList}).
+-spec get_server(atom()) -> {ok, craterl_server_spec()}.
+get_server(ClientName) ->
+    gen_server:call(ClientName, get_server).
 
-add_active(Server) ->
-    gen_server:call(?MODULE, {add_active, Server}).
+set_servers(ClientName, ServerList) when is_list(ServerList) ->
+    gen_server:call(ClientName, {set_servers, ServerList}).
 
-add_inactive(Server) ->
-    gen_server:call(?MODULE, {add_inactive, Server}).
+add_active(ClientName, Server) ->
+    gen_server:call(ClientName, {add_active, Server}).
 
-stop() -> gen_server:cast(?MODULE, stop).
+add_inactive(ClientName, Server) ->
+    gen_server:call(ClientName, {add_inactive, Server}).
+
+stop(ClientName) ->
+  gen_server:cast(ClientName, stop).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -88,32 +102,22 @@ stop() -> gen_server:cast(?MODULE, stop).
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init(_) ->
-    random:seed(now()),
-    Servers = parse_servers_string(config_provider:get(crate_servers, [?DEFAULT_SERVER])),
-    lager:info("Servers configured ~p", [Servers]),
-    {ok, #connections{activelist=Servers,
-                      inactivelist=[]}}.
-
-parse_servers_string(ServersString) when is_list(ServersString) ->
-  parse_servers_string(list_to_binary(ServersString));
-parse_servers_string(ServersString) when is_binary(ServersString) ->
-  lists:filter(
-    fun
-      (HostAndPort) when is_binary(HostAndPort) ->
-        case binary:split(HostAndPort, <<":">>) of
-          [_,_] -> true;
-          [_] -> false
-        end,
-        true;
-      (_) -> false
-    end,
-    lists:map(
-      fun(ServerString) -> binary:replace(ServerString, <<" ">>, <<"">>, [global]) end,
-      binary:split(ServersString, <<",">>, [global])
-    )
-  );
-parse_servers_string(_) -> [].
+init(Args) ->
+    Servers  = proplists:get_value(servers, Args, [?CRATERL_DEFAULT_SERVER]),
+    Options  = proplists:get_value(options, Args, []),
+    PoolName = proplists:get_value(poolname, Options, ?DEFAULT_POOLNAME),
+    PoolSize = proplists:get_value(poolsize, Options, ?DEFAULT_POOLSIZE),
+    Timeout  = proplists:get_value(timeout, Options, ?DEFAULT_TIMEOUT),
+    ok = hackney_pool:start_pool(PoolName, [{timeout, Timeout}, {max_connections, PoolSize}]),
+    {ok,  #state{
+      connections = #connections{
+                      activelist=Servers,
+                      inactivelist=[]
+      },
+      poolname = PoolName,
+      poolsize = PoolSize,
+      timeout = Timeout
+    }}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -129,34 +133,51 @@ parse_servers_string(_) -> [].
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call(getserver, _From, 
-            #connections{activelist=Active, 
-                         inactivelist=Inactive}) ->
-    lager:info("getserver start "),
+new_state(#state{poolname = PoolName, poolsize = PoolSize, timeout = Timeout}, Connections=#connections{}) ->
+  #state{
+    connections = Connections,
+    poolname = PoolName,
+    poolsize = PoolSize,
+    timeout = Timeout
+  }.
+
+handle_call(get_server, _From,
+            State = #state{connections = #connections{
+              activelist = Active,
+              inactivelist = Inactive
+            }}) ->
+    lager:info("getserver "),
     case lookup(Active, Inactive) of
-        none_active -> {reply, none_active, #connections{activelist=Active, inactivelist=Inactive}};
-        {Server, NewActive} -> {reply, {ok, Server}, #connections{activelist=NewActive, inactivelist=Inactive}}
+        none_active -> {reply, none_active, State};
+        Server -> {reply, {ok, Server}, State}
     end;
 
-handle_call({set_servers, ServerList}, _From, _State) ->
+handle_call({set_servers, ServerList}, _From, State=#state{}) ->
     lager:info("set_servers "),
-    {reply, ok, #connections{activelist=ServerList,
-                             inactivelist=[]}};
+    {reply, ok, new_state(State, #connections{activelist=ServerList, inactivelist=[]})};
 
 handle_call({add_active, Server}, _From,
-            #connections{activelist=Active,
-                         inactivelist=Inactive}) ->
+            State = #state{connections = #connections{activelist=Active,
+                         inactivelist=Inactive}}) ->
     lager:info("getserver active "),
-    {reply, ok, #connections{activelist=[Server|Active],
-                             inactivelist=Inactive}};
+    {
+      reply,
+      ok,
+      new_state(
+        State,
+        #connections{
+          activelist=[Server|Active],
+          inactivelist=Inactive
+        })
+    };
 
 handle_call({add_inactive, Server}, _From, 
-            #connections{activelist=Active, 
-                         inactivelist=Inactive}) ->
+            State=#state{connections = #connections{activelist=Active,
+                         inactivelist=Inactive}}) ->
     lager:info("getserver inactive "),
     NewActive = lists:delete(Server, Active),
-    {reply, ok, #connections{activelist=NewActive,
-                             inactivelist=[Server|Inactive]}};
+    {reply, ok, new_state(State, #connections{activelist=NewActive,
+                             inactivelist=[Server|Inactive]})};
 
 handle_call(Request, _From, State) ->
     lager:error("unexpected request ~p, state ~p", [Request, State]),
@@ -219,9 +240,8 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-lookup([H|[]], _Inactive) -> {H, [H]};
 lookup([], _) -> none_active;
-lookup(Active, _Inactive) when is_list(Active) ->
-  [Server|Rest] = Active,
-  {Server, Rest ++ [Server]}.
-
+lookup([H|[]], _Inactive) ->
+  H;
+lookup(Active, _Inactive) ->
+  lists:nth(random:uniform(length(Active)), Active).

@@ -28,65 +28,176 @@
 -include("craterl.hrl").
 -compile([{parse_transform, lager_transform}]).
 
-
 %% API
--export([sql/1, sql/2,
-  blob_get/2, blob_get_to_file/3,
-  blob_put/2, blob_put_file/2,
-  blob_exists/2,
-  start/0]).
+-export([
+  start/0,
+  new/0, new/1, new/2, new/3,
+  sql/1, sql/2, sql/3, sql/4,
+  sql_bulk/1, sql_bulk/2, sql_bulk/3, sql_bulk/4,
+  blob_get/2, blob_get/3,
+  blob_get_to_file/3, blob_get_to_file/4,
+  blob_put/2, blob_put/3,
+  blob_put_file/2, blob_put_file/3,
+  blob_exists/2, blob_exists/3
+  ]).
+
+
+-define(DEFAULT_CLIENT_SPEC, {local, ?MODULE}).
 
 start() ->
-  application:ensure_all_started(jsx),
-  application:ensure_all_started(hackney),
-  application:ensure_all_started(lager),
-  application:start(craterl).
+  start_deps(craterl, permanent).
+
+start_deps(App, Type) ->
+  case application:start(App, Type) of
+    {error, {not_started, Dep}} ->
+      start_deps(Dep, Type),
+      start_deps(App, Type);
+    ok -> ok
+  end.
+
+-spec new() -> atom().
+new() ->
+  new(?DEFAULT_CLIENT_SPEC, [?CRATERL_DEFAULT_SERVER], []).
+
+-spec new([craterl_server_spec()]) -> atom().
+new(Servers) ->
+  new(?DEFAULT_CLIENT_SPEC, Servers, []).
+
+-spec new([craterl_server_spec()], [term()]) -> atom().
+new(Servers, Options) when is_list(Options) ->
+  new(?DEFAULT_CLIENT_SPEC, Servers, Options).
+
+-spec new(ClientSpec:: craterl_client_spec(), Servers::[craterl_server_spec()], Options::[term()]) -> atom().
+new(ClientSpec, Servers, Options) ->
+  craterl_sup:start_client(ClientSpec, Servers, Options).
 
 
+%%--------------------------------------------------------------------
+%% @doc
+%% issue a SQL statement with optional arguments
+%% or a prebuilt #sql_request{}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec sql(Stmt::binary()|string()) -> {ok, sql_response()};
+    (Request::sql_request())  -> {ok, sql_response()};
+    (term()) -> {error, unsupported}.
 sql(Stmt) when is_binary(Stmt) ->
     sql(Stmt, []);
 sql(Stmt) when is_list(Stmt) ->
     sql(list_to_binary(Stmt), []);
+sql(Request = #sql_request{}) ->
+    sql(?MODULE, Request);
 sql(_) -> {error, unsupported}.
 
+
+%%--------------------------------------------------------------------
+%% @doc
+%% issue a SQL statement with optional arguments
+%% or a prebuilt #sql_request{} to a specific client
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec sql(Stmt::binary()|string(), Args::list())      -> {ok, sql_response()};
+         (ClientName::atom(), Request::sql_request()) -> {ok, sql_response()}.
 sql(Stmt, Args) when is_list(Stmt) and is_list(Args) ->
-    sql(list_to_binary(Stmt), Args);
-
+    sql(list_to_binary(Stmt), Args, false);
 sql(Stmt, Args) when is_binary(Stmt) and is_list(Args) ->
-    Request = #sql_request{stmt=Stmt, args=Args},
+    sql(Stmt, Args, false);
+sql(ClientName, Request = #sql_request{}) when is_atom(ClientName) ->
     SuccessFun = fun
-      (SqlResponse = #sql_response{}) -> {ok, SqlResponse};
-      (Response) -> {error, invalid_response, Response}
-    end,
-    request(Request, SuccessFun);
-sql(_, _) -> {error, unsupported}.
+    (SqlResponse = #sql_response{}) -> {ok, SqlResponse};
+    (Response) -> {error, {invalid_response, Response}}
+   end,
+   execute_request(ClientName, Request, SuccessFun).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% issue a SQL statement with optional arguments
+%% and a boolean indicating whether you want to receive type information
+%% for the returned columns.
+%% @end
+%%--------------------------------------------------------------------
+-spec sql(Stmt::binary()|string(), Args::list(), IncludeTypes::boolean()) -> {ok, sql_response()}.
+sql(Stmt, Args, IncludeTypes) when is_binary(Stmt) and is_list(Args) and is_boolean(IncludeTypes) ->
+  sql(?MODULE, #sql_request{stmt=Stmt, args=Args, includeTypes = IncludeTypes}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% issue a SQL statement with optional arguments
+%% and a boolean indicating whether you want to receive type information
+%% for the returned columns
+%% to a specific client.
+%% @end
+%%--------------------------------------------------------------------
+-spec sql(ClientName::atom(), Stmt::binary()|string(), Args::list(), IncludeTypes::boolean()) -> {ok, sql_response()}.
+sql(ClientName, Stmt, Args, IncludeTypes) ->
+   sql(ClientName, #sql_request{stmt=Stmt, args=Args, includeTypes = IncludeTypes}).
 
 
-request(Request, SuccessFun) when is_function(SuccessFun) ->
-  case connection_manager:get_server() of
-      none_active ->
-          {error, "No active server"};
-      {ok, Server} ->
-        case crate_request_handler_sup:request(Request, Server, self()) of
-          {ok, ChildPid} ->
-            receive
-                {ChildPid, {ok, Response}} ->
-                    SuccessFun(Response);
-                {ChildPid, {error, econnrefused}} ->
-                    lager:info("request/econnrefused: ~p~n", [Server]),
-                    connection_manager:add_inactive(Server),
-                    request(Request, SuccessFun);
-                {ChildPid, {error, OtherError}} ->
-                    lager:info("request/error: ~p~n", [OtherError]),
-                    {error, OtherError};
-                {ChildPid, Other} ->
-                    lager:error("request/other: ~p", [Other])
-            end
-        end
-  end.
+%%--------------------------------------------------------------------
+%% @doc
+%% issue a Bulk SQL statement using a #sql_bulk_request{}
+%%
+%% Bulk statements are only valid for INSERT/UPDATE and DELETE queries
+%% @end
+%%--------------------------------------------------------------------
+-spec sql_bulk(BulkRequest::sql_bulk_request()) -> {ok, sql_bulk_response()} | {error, term()}.
+sql_bulk(BulkRequest=#sql_bulk_request{}) ->
+  sql_bulk(?MODULE, BulkRequest).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% issue a Bulk SQL statement using a #sql_bulk_request{}
+%% to a specific client.
+%% Or giving a binary or string statement and a list of bulk arguments
+%% to the default client.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec sql_bulk(ClientName::atom(), BulkRequest::sql_bulk_request()) -> {ok, sql_bulk_response()} | {error, term()};
+    (Stmt::binary()|string(), [[term()]]) -> {ok, sql_bulk_response()} | {error, term()}.
+sql_bulk(ClientName, BulkRequest=#sql_bulk_request{}) ->
+  SuccessFun = fun
+    (SqlBulkResponse = #sql_bulk_response{}) -> {ok, SqlBulkResponse};
+    (Response) -> {error, {invalid_respone, Response}}
+  end,
+  execute_request(ClientName, BulkRequest, SuccessFun);
+sql_bulk(Stmt, BulkArgs) when is_list(Stmt) ->
+  sql_bulk(list_to_binary(Stmt), BulkArgs);
+sql_bulk(Stmt, BulkArgs) when is_binary(Stmt) ->
+  sql_bulk(?MODULE, Stmt, BulkArgs, false).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% issue a Bulk SQL statement with bulk arguments and
+%% a boolean that determines if the response should contain
+%% column types or not.
+%% @end
+%%--------------------------------------------------------------------
+sql_bulk(Stmt, BulkArgs, IncludeTypes) when is_binary(Stmt) ->
+  sql_bulk(?MODULE, Stmt, BulkArgs, IncludeTypes).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% issue a Bulk SQL statement with bulk arguments and
+%% a boolean that determines if the response should contain
+%% column types or not
+%% to a specifi client.
+%% @end
+%%--------------------------------------------------------------------
+-spec sql_bulk(ClientName::atom(), Stmt::binary(), BulkArgs::[[term()]], IncludeTypes::boolean()) -> {ok, sql_bulk_response()} | {error, term()}.
+sql_bulk(ClientName, Stmt, BulkArgs, IncludeTypes)->
+  sql_bulk(ClientName, #sql_bulk_request{stmt = Stmt, bulk_args = BulkArgs, includeTypes = IncludeTypes}).
 
 
+
+-spec blob_get(binary(), binary()) -> {ok, term()}.
 blob_get(BlobTable, HexDigest) ->
+  blob_get(?MODULE, BlobTable, HexDigest).
+
+-spec blob_get(ClientName::atom(), binary(), binary()) -> {ok, term()}.
+blob_get(ClientName, BlobTable, HexDigest) ->
   Request = #blob_request{
                method=get,
                table=BlobTable,
@@ -94,11 +205,17 @@ blob_get(BlobTable, HexDigest) ->
   SuccessFun = fun
     (GetDataFun) when is_function(GetDataFun) ->
       {ok, GetDataFun};
-    (Response) -> {error, invalid_response, Response}
+    (Response) -> {error, {invalid_response, Response}}
   end,
-  request(Request, SuccessFun).
+  execute_request(ClientName, Request, SuccessFun).
 
+
+-spec blob_get_to_file(BlobTable::binary(), HexDigest::binary(), FilePath::iolist()) -> {ok, binary()}.
 blob_get_to_file(BlobTable, HexDigest, FilePath) ->
+  blob_get_to_file(?MODULE, BlobTable, HexDigest, FilePath).
+
+-spec blob_get_to_file(ClientName::atom(), BlobTable::binary(), HexDigest::binary(), FilePath::iolist()) -> {ok, binary()}.
+blob_get_to_file(ClientName, BlobTable, HexDigest, FilePath) ->
   Request = #blob_request{
                method=get,
                table=BlobTable,
@@ -106,43 +223,95 @@ blob_get_to_file(BlobTable, HexDigest, FilePath) ->
                payload={file, FilePath}},
   SuccessFun = fun
     (ResultFilePath) when is_binary(ResultFilePath) -> {ok, ResultFilePath};
-    (Response) -> {error, invalid_response, Response}
+    (Response) -> {error, {invalid_response, Response}}
   end,
-  request(Request, SuccessFun).
+  execute_request(ClientName, Request, SuccessFun).
 
+
+-spec blob_exists(BlobTable::binary(), HexDigest::binary()) -> ok.
 blob_exists(BlobTable, HexDigest) ->
+  blob_exists(?MODULE, BlobTable, HexDigest).
+-spec blob_exists(ClientName::atom(), BlobTable::binary(), HexDigest::binary()) -> ok.
+blob_exists(ClientName, BlobTable, HexDigest) ->
   Request = #blob_request{
                method=head,
                table=BlobTable,
                digest=HexDigest},
-  SuccessFun = fun
-    (ResultFilePath) when is_binary(ResultFilePath) -> {ok, ResultFilePath};
-    (Response) -> {error, invalid_response, Response}
-  end,
-  request(Request, SuccessFun).
+  SuccessFun = fun(ok) -> ok end,
+  execute_request(ClientName, Request, SuccessFun).
 
+
+-spec blob_put(BlobTable::binary(), Content::binary()) -> {ok, {created, binary()}} | {error, term()}.
 blob_put(BlobTable, Content) ->
+  blob_put(?MODULE, BlobTable, Content).
+-spec blob_put(ClientName::atom(), BlobTable::binary(), Content::binary()) -> {ok, {created, binary()}} | {error, term()}.
+blob_put(ClientName, BlobTable, Content) ->
   case craterl_hash:sha1Hex(Content) of
     {ok, HexDigest} ->
-      send_blob(BlobTable, HexDigest, {data, Content})
+      send_blob(ClientName, BlobTable, HexDigest, {data, Content})
   end.
 
+
+-spec blob_put_file(BlobTable::binary(), FilePath::binary()) -> {ok, {created, binary()}} | {error, term()}.
 blob_put_file(BlobTable, FilePath) ->
+  blob_put_file(?MODULE, BlobTable, FilePath).
+
+-spec blob_put_file(ClientName::atom(), BlobTable::binary(), FilePath::binary()) -> {ok, {created, binary()}} | {error, term()}.
+blob_put_file(ClientName, BlobTable, FilePath) ->
   case craterl_hash:sha1HexFile(FilePath) of
     {ok, HexDigest} ->
-      send_blob(BlobTable, HexDigest, {file, FilePath});
+      send_blob(ClientName, BlobTable, HexDigest, {file, FilePath});
     {error, Reason} -> {error, Reason}
   end.
 
-send_blob(BlobTable, HexDigest, Payload) ->
+
+
+%%% INTERNAL %%%
+
+-spec send_blob(atom(), binary(), binary(), binary()) -> {ok, created, binary()} | {error, invalud_response, term()}.
+send_blob(ClientName, BlobTable, HexDigest, Payload) ->
   Request = #blob_request{
                method=put,
                table=BlobTable,
                digest=HexDigest,
                payload=Payload},
   SuccessFun = fun
-    ({created, Digest}) -> {ok, created, Digest};
-    (Response) -> {error, invalid_response, Response}
+    ({created, Digest}) -> {ok, {created, Digest}};
+    (Response) -> {error, {invalid_response, Response}}
   end,
-  request(Request, SuccessFun).
+  execute_request(ClientName, Request, SuccessFun).
 
+-spec execute_request(atom(), blob_request(),     fun()) -> ok | {ok, term()} | {error, term()};
+                     (atom(), sql_request(),      fun()) -> {ok, sql_response()} | {error, term()};
+                     (atom(), sql_bulk_request(), fun()) -> {ok, sql_bulk_response()} | {error, term()}.
+execute_request(ClientName, Request, SuccessFun) when is_function(SuccessFun) ->
+  case craterl_gen_server:get_server(ClientName) of
+      none_active ->
+          {error, "No active server"};
+      {ok, Server} ->
+        case execute_request_on_server(Request, Server, SuccessFun) of
+          {error, Reason} ->
+            craterl_gen_server:add_inactive(ClientName, Server),
+            {error, Reason};
+          Response -> Response
+        end
+  end.
+
+-spec execute_request_on_server(sql_request(), craterl_server_spec(), fun()) -> {ok, sql_response()} | {error, term()};
+                               (sql_bulk_request(), craterl_server_spec(), fun()) -> {ok, sql_bulk_response()} | {error, term()};
+                               (blob_request(), craterl_server_spec(), fun()) -> ok|{ok, sql_response()} | {error, term()}.
+execute_request_on_server(Request=#sql_request{}, Server, SuccessFun) ->
+  case craterl_sql:sql_request(Request, Server) of
+    {ok, Response=#sql_response{}} -> SuccessFun(Response);
+    Other -> Other
+  end;
+execute_request_on_server(Request=#sql_bulk_request{}, Server, SuccessFun) ->
+  case craterl_sql:sql_request(Request, Server) of
+    {ok, Response=#sql_bulk_response{}} -> SuccessFun(Response);
+    Other -> Other
+  end;
+execute_request_on_server(Request=#blob_request{}, Server, SuccessFun) ->
+  case craterl_blob:blob_request(Request, Server) of
+    {ok, Response} -> SuccessFun(Response);
+    Other -> Other
+  end.

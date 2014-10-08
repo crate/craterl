@@ -28,6 +28,9 @@
 %% API
 -export([sha1Hex/1, sha1HexFile/1, sha1HexFileData/1]).
 
+-define(CHUNK_SIZE, 4194304).
+
+-spec(sha1Hex(binary()) -> {ok, binary()}).
 sha1Hex(Content) when is_binary(Content) ->
   Ctx = crypto:hash_init(sha),
   hashContent(Ctx, <<>>, Content).
@@ -40,13 +43,17 @@ hashContent(Ctx, Content, Rest) ->
   NewCtx = crypto:hash_update(Ctx, Content),
   Bytes = byte_size(Rest),
   if
-    Bytes =< 4194304 -> %% TODO: find optimal chunk size
+    Bytes =< ?CHUNK_SIZE -> %% TODO: find optimal chunk size
       hashContent(NewCtx, Rest, <<>>);
     true ->
-      <<Chunk:Bytes/binary, NewRest/binary>> = Content,
+      <<Chunk:Bytes/binary, NewRest/binary>> = Rest,
       hashContent(NewCtx, Chunk, NewRest)
   end.
 
+%%
+%% @doc hashing the file contents of the file at FilePath
+%%
+-spec( sha1HexFile(binary()|string()) -> {ok, binary()}|{error, term()}).
 sha1HexFile(FilePath) ->
   case file:open(FilePath, [read, raw, binary]) of
     {ok, FileHandle} ->
@@ -57,6 +64,11 @@ sha1HexFile(FilePath) ->
     {error, Reason} -> {error, Reason}
   end.
 
+
+%%
+%% @doc hashing the file contents of the file at FilePath and return the file data too
+%%
+-spec( sha1HexFileData(binary()|string()) -> {ok, binary(), binary()} | {error, term()}).
 sha1HexFileData(FilePath) ->
   case file:open(FilePath, [read, raw, binary]) of
     {ok, FileHandle} ->
@@ -68,7 +80,7 @@ sha1HexFileData(FilePath) ->
   end.
 
 hashOpenFile(FileHandle, HashCtx) ->
-  case file:read(FileHandle, 4194304) of
+  case file:read(FileHandle, ?CHUNK_SIZE) of
     {ok, Data} ->
       NewHashCtx = crypto:hash_update(HashCtx, Data),
       hashOpenFile(FileHandle, NewHashCtx);
@@ -79,9 +91,8 @@ hashOpenFile(FileHandle, HashCtx) ->
       {error, Reason}
   end.
 
-
 hashOpenFile(FileHandle, HashCtx, DataAcc) when is_binary(DataAcc) ->
-  case file:read(FileHandle, 4194304) of
+  case file:read(FileHandle, ?CHUNK_SIZE) of
     {ok, Data} ->
       NewHashCtx = crypto:hash_update(HashCtx, Data),
       hashOpenFile(FileHandle, NewHashCtx, <<DataAcc/binary, Data/binary>>);

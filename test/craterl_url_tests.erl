@@ -18,27 +18,36 @@
 %%% However, if you have executed another commercial license agreement
 %%% with Crate these terms will supersede the license and you may use the
 %%% software solely pursuant to the terms of the relevant commercial agreement.
+%%% 
+%%% @author Matthias Wahl
+%%%
 %%% @doc
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(craterl_app).
+-module(craterl_url_tests).
+-author("Matthias Wahl").
 
--behaviour(application).
+-include("craterl.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
-%% API
--export([]).
-
-%% Application callbacks
--export([start/2, stop/1]).
-
-%% ===================================================================
-%% Application callbacks
-%% ===================================================================
-
-start(_StartType, _StartArgs) ->
-    craterl_sup:start_link().
-
-stop(_) ->
-    ok.
+server_uri_from_spec_test_() ->
+  {
+    "create a server url from a spec",
+    [
+      ?_assertEqual(
+        <<"http://localhost:4200/_sql?types">>,
+        craterl_url:create_server_url({<<"localhost">>, 4200}, true)
+      ),
+      ?_assertEqual(
+        <<"http://localhost:4200/_sql">>,
+        craterl_url:create_server_url({<<"localhost">>, 4200}, false)
+      ),
+      ?_assertEqual(
+        <<"http://localhost:4200/_sql">>,
+        craterl_url:create_server_url({<<"localhost">>, 4200}, <<"/_sql">>)),
+      ?_assertEqual(<<"http://bla:123/_sql">>, craterl_url:create_server_url({<<"http://bla">>, 123}, <<"/_sql">>)),
+      ?_assertEqual(<<"https://secure:4200/_sql">>, craterl_url:create_server_url({<<"https://secure">>,4200}, <<"/_sql">>))
+    ]
+  }.

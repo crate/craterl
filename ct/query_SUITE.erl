@@ -41,9 +41,12 @@ all() ->
 init_per_suite(Config) ->
   ok = hackney:start(),
   ok = craterl:start(),
-  Config.
+  ClientRef = craterl:new(),
+  [{client, ClientRef} | Config].
 
 end_per_suite(Config) ->
+  ClientRef = ct:get_config(client),
+  craterl_gen_server:stop(ClientRef),
   application:stop(craterl),
   Config.
 
@@ -58,4 +61,4 @@ simple_query_test_binary(_Config) ->
   [<<"id">>, <<"name">>] = Response#sql_response.cols.
 
 simple_query_test_str(_Config) ->
-  {ok, #sql_response{}} = craterl:sql("select * from sys.cluster").
+  {ok, #sql_response{cols=[<<"id">>,<<"name">>,<<"master_node">>, <<"settings">>]}} = craterl:sql("select * from sys.cluster").

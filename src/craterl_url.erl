@@ -18,27 +18,44 @@
 %%% However, if you have executed another commercial license agreement
 %%% with Crate these terms will supersede the license and you may use the
 %%% software solely pursuant to the terms of the relevant commercial agreement.
+%%% 
+%%% @author Matthias Wahl
+%%%
 %%% @doc
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(craterl_app).
-
--behaviour(application).
+-module(craterl_url).
+-author("Matthias Wahl").
 
 %% API
--export([]).
+-export([
+  create_server_url/2
+]).
 
-%% Application callbacks
--export([start/2, stop/1]).
+-ifdef(TEST).
+-compile(export_all).
+-endif.
 
-%% ===================================================================
-%% Application callbacks
-%% ===================================================================
+-include("craterl.hrl").
+-compile([{parse_transform, lager_transform}]).
 
-start(_StartType, _StartArgs) ->
-    craterl_sup:start_link().
+-define(SQLPATH, <<"/_sql">>).
 
-stop(_) ->
-    ok.
+%%% API %%%
+
+-spec create_server_url(craterl_server_spec(), boolean()) -> binary();
+                       (craterl_server_spec(), binary())  -> binary().
+create_server_url({Host, Port}, true) ->
+  create_server_url({Host, Port}, <<?SQLPATH/binary, "?types">>);
+create_server_url({Host, Port}, false) ->
+  create_server_url({Host, Port}, ?SQLPATH);
+create_server_url({Host, Port}, Path) when is_binary(Path) ->
+  PortString = integer_to_binary(Port),
+  Url = <<Host/binary, ":", PortString/binary, Path/binary>>,
+  case Url of
+    <<"http://", _/binary>> -> Url;
+    <<"https://", _/binary>> -> Url;
+    <<_/binary>> -> <<"http://", Url/binary>>
+  end.

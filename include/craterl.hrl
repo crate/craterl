@@ -24,20 +24,89 @@
 %%%-------------------------------------------------------------------
 -author("mat").
 
+-define(CRATERL_DEFAULT_PORT, 4200).
+-define(CRATERL_DEFAULT_ROWCOUNT, 0).
+-define(CRATERL_DEFAULT_DURATION, 0).
+-define(CRATERL_DEFAULT_MESSAGE, <<"Shit happens">>).
+-define(CRATERL_DEFAULT_ERROR_CODE, 1000).
+-define(CRATERL_DEFAULT_SERVER, {<<"localhost">>, 4200}).
 
--define(SQLPATH, <<"/_sql">>).
--define(DEFAULT_PORT, 4200).
--define(DEFAULT_ROWCOUNT, 0).
--define(DEFAULT_DURATION, 0).
--define(DEFAULT_WALLCLOCK, 0).
--define(DEFAULT_RUNTIME, 0).
--define(DEFAULT_MESSAGE, <<"Shit happens">>).
--define(DEFAULT_CODE, 1000).
--define(DEFAULT_SERVER, <<"localhost:4200">>).
+-define(CRATE_TYPE_UNDEFINED, 0).
+-define(CRATE_TYPE_NOT_SUPPORTED, 1).
+-define(CRATE_TYPE_BYTE, 2).
+-define(CRATE_TYPE_BOOLEAN, 3).
+-define(CRATE_TYPE_STRING, 4).
+-define(CRATE_TYPE_IP, 5).
+-define(CRATE_TYPE_DOUBLE, 6).
+-define(CRATE_TYPE_FLOAT, 7).
+-define(CRATE_TYPE_SHORT, 8).
+-define(CRATE_TYPE_INTEGER, 9).
+-define(CRATE_TYPE_LONG, 10).
+-define(CRATE_TYPE_TIMESTAMP, 11).
+-define(CRATE_TYPE_OBJECT, 12).
+-define(CRATE_TYPE_GEOPOINT, 13).
+-define(CRATE_TYPE_ARRAY, 100).
+-define(CRATE_TYPE_SET, 101).
 
--record(sql_response, {cols=[], rows=[], rowCount=?DEFAULT_ROWCOUNT, duration=?DEFAULT_DURATION, wallclock=?DEFAULT_WALLCLOCK, runtime=?DEFAULT_RUNTIME}).
+-type craterl_client_spec() :: {local, atom()} | {global, atom()} | {via, atom(), atom()}.
 
--record(sql_request, {stmt, args=[]}).
--record(sql_error, {message=?DEFAULT_MESSAGE, code=?DEFAULT_CODE}).
+-type craterl_server_spec() :: binary().
 
--record(blob_request, {method, table, digest, payload=undefined}).
+-record(sql_request, {
+        stmt :: binary(),
+        args=[] :: list(),
+        includeTypes=false :: boolean()
+}).
+-type sql_request() :: #sql_request{}.
+
+-record(sql_response, {
+        cols=[] :: [binary()],
+        colTypes=[] :: [integer()],
+        rows=[] :: [ [any()] ],
+        rowCount=?CRATERL_DEFAULT_ROWCOUNT :: integer(),
+        duration=?CRATERL_DEFAULT_DURATION :: non_neg_integer()
+    }).
+-type sql_response() :: #sql_response{}.
+
+-record(sql_bulk_request, {
+        stmt :: binary(),
+        bulk_args=[[]] :: [ [ any() ] ],
+        includeTypes=false :: boolean()
+}).
+-type sql_bulk_request() :: #sql_bulk_request{}.
+
+-record(sql_bulk_response, {
+        cols=[] :: [binary()],
+        colTypes=[] :: [integer()],
+        results :: [sql_bulk_result()],
+        duration=?CRATERL_DEFAULT_DURATION :: non_neg_integer()
+}).
+-type sql_bulk_response() :: #sql_bulk_response{}.
+
+-record(sql_bulk_result, {
+        rowCount=?CRATERL_DEFAULT_ROWCOUNT :: non_neg_integer(),
+        errorMessage :: binary()
+}).
+-type sql_bulk_result() :: #sql_bulk_result{}.
+
+-record(sql_error, {
+        message=?CRATERL_DEFAULT_MESSAGE :: binary(),
+        code=?CRATERL_DEFAULT_ERROR_CODE :: integer()
+}).
+-type sql_error() :: #sql_error{}.
+
+-record(blob_request, {
+    method :: atom(),
+    table :: binary(),
+    digest :: binary(),
+    payload=undefined :: binary()
+}).
+-type blob_request() :: #blob_request{}.
+
+-export_type([
+  craterl_client_spec/0,
+  craterl_server_spec/0,
+  sql_request/0, sql_response/0, sql_error/0,
+  sql_bulk_response/0, sql_bulk_request/0, sql_bulk_result/0,
+  blob_request/0
+]).

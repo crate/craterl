@@ -33,19 +33,24 @@ setup_sql() ->
   meck:new(hackney),
   meck:expect(hackney, request, 5, meck:seq([
     {ok, 200, [], make_ref()},
+     {ok, 200, [], make_ref()},
     {ok, 200, [], make_ref()},
     {ok, 200, [], make_ref()},
     {ok, 400, [], make_ref()},
+    {ok, 200, [], make_ref()},
+    {error, timeout},
     {ok, 200, [], make_ref()}
   ])
   ),
   meck:expect(hackney, body, 1,
     meck:seq([
       {ok, <<"{}">>},
+      {ok, <<"{\"cols\":[], \"col_types\":[1,2], \"results\":[], \"duration\":4}">>},
       {ok, <<"{\"cols\":[\"a\",\"b\"], \"rows\":[[true, 5.6],[false, -5.6]], \"rowcount\":2, \"duration\":12456}">>},
       {ok, <<"invalid">>},
       {ok, <<"{\"error\":{\"code\":4000, \"message\":\"something went wrong\"}}">>},
-      {ok, <<"">>}
+      {ok, <<"">>},
+      {error, closed}
     ])
   ),
   ok.
@@ -69,6 +74,10 @@ sql_request_test_() ->
           craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
         ),
         ?_assertEqual(
+          {ok, #sql_bulk_response{cols = [], colTypes = [1,2], results = [], duration = 4}},
+          craterl_sql:sql_request(#sql_bulk_request{stmt = <<"select * from t">>, bulk_args=[]}, {<<"localhost">>, 4300})
+        ),
+        ?_assertEqual(
           {ok, #sql_response{cols = [<<"a">>, <<"b">>], rows = [[true, 5.6], [false, -5.6]], rowCount=2, duration=12456}},
           craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
         ),
@@ -83,7 +92,16 @@ sql_request_test_() ->
         ?_assertEqual(
           {error, no_content},
           craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
+        ),
+        ?_assertEqual(
+          {error, timeout},
+          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
+        ),
+        ?_assertEqual(
+          {error, closed},
+          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
         )
+
       ]
     end
   }
@@ -105,4 +123,6 @@ build_error_response_test() ->
   ?assertEqual(#sql_error{code = 1000, message = <<"DAU Exception">>},
     craterl_sql:build_error_response(<<"{\"error\":{\"message\":\"DAU Exception\",\"code\":1000}}">>)
   ),
-  ?assertEqual(#sql_error{}, craterl_sql:build_error_response(<<"{}">>)).
+  ?assertEqual(#sql_error{}, craterl_sql:build_error_response(<<"{}">>)),
+  ?assertEqual({error,invalid_json}, craterl_sql:build_error_response(<<"">>)),
+  ?assertEqual({error,invalid_json}, craterl_sql:build_error_response(<<>>)).

@@ -90,18 +90,28 @@ create_payload(Stmt, Args) ->
 create_payload(Payload) ->
   jsx:encode(Payload).
 
--spec build_response(binary()) -> sql_response() | {error, invalid_json}.
+-spec build_response(binary()) -> sql_response() | sql_bulk_response() | {error, invalid_json}.
 build_response(Body) when is_binary(Body) ->
   try case jsx:decode(Body) of
-    % we expect all the body in one (not-chunked) response
-    {incomplete, _DecodeFun} -> {error, invalid_json};
-    Decoded -> #sql_response{
-      rowCount = proplists:get_value(<<"rowcount">>, Decoded, 0),
-      cols = proplists:get_value(<<"cols">>, Decoded, []),
-      colTypes = proplists:get_value(<<"col_types">>, Decoded, []),
-      rows = proplists:get_value(<<"rows">>, Decoded, []),
-      duration = proplists:get_value(<<"duration">>, Decoded, 0)
-    }
+    Decoded ->
+      Columns = proplists:get_value(<<"cols">>, Decoded, []),
+      ColumnTypes = proplists:get_value(<<"col_types">>, Decoded, []),
+      Duration = proplists:get_value(<<"duration">>, Decoded, 0),
+      case proplists:get_value(<<"results">>, Decoded) of
+        undefined ->  #sql_response{
+            rowCount = proplists:get_value(<<"rowcount">>, Decoded, 0),
+            cols = Columns,
+            colTypes = ColumnTypes,
+            rows = proplists:get_value(<<"rows">>, Decoded, []),
+            duration = Duration
+          };
+        Results -> #sql_bulk_response{
+            results = Results,
+            cols = Columns,
+            colTypes = ColumnTypes,
+            duration = Duration
+          }
+      end
   end
   catch
     error:badarg -> {error, invalid_json}
@@ -110,15 +120,13 @@ build_response(Body) when is_binary(Body) ->
 
 -spec build_error_response(binary()) -> sql_error() | {error, invalid_json}.
 build_error_response(Body) when is_binary(Body) ->
-  try case jsx:decode(Body) of
-    {incomplete, _DecodeFun} -> {error, invalid_json};
-    Decoded ->
-      ErrorInfo = proplists:get_value(<<"error">>, Decoded, []),
-      #sql_error{
-        code=proplists:get_value(<<"code">>, ErrorInfo, ?CRATERL_DEFAULT_ERROR_CODE),
-        message=proplists:get_value(<<"message">>, ErrorInfo, ?CRATERL_DEFAULT_MESSAGE)
-      }
-  end
+  try
+    Decoded = jsx:decode(Body),
+    ErrorInfo = proplists:get_value(<<"error">>, Decoded, []),
+    #sql_error{
+      code=proplists:get_value(<<"code">>, ErrorInfo, ?CRATERL_DEFAULT_ERROR_CODE),
+      message=proplists:get_value(<<"message">>, ErrorInfo, ?CRATERL_DEFAULT_MESSAGE)
+    }
   catch
     error:badarg -> {error, invalid_json}
   end.

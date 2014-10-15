@@ -86,3 +86,45 @@ sha1_big_file_test_() ->
       end
     )
   }.
+
+hash_open_file_test_() -> {
+  "test sha1 generation from an open file handle",
+  ?SHA1_FILE_SETUP(
+    fun (FilePath) ->
+      {ok, FileHandle} = file:open(FilePath, [read, raw, binary]),
+      Result1 = craterl_hash:hashOpenFile(FileHandle, crypto:hash_init(sha)),
+      file:close(FileHandle),
+      [
+        ?_assertEqual(
+          {ok, <<"05fe405753166f125559e7c9ac558654f107c7e9">>},
+          Result1
+        ),
+        ?_assertEqual(
+            {error, einval},
+            craterl_hash:hashOpenFile(FileHandle, crypto:hash_init(sha))
+        )
+      ]
+    end
+  )
+}.
+
+hash_open_file_data_acc_test_() -> {
+  "test sha1 generation from an open file handle",
+  ?SHA1_FILE_SETUP(
+    fun (FilePath) ->
+      {ok, FileHandle} = file:open(FilePath, [read, raw, binary]),
+      Result1 = craterl_hash:hashOpenFile(FileHandle, crypto:hash_init(sha), <<>>),
+      file:close(FileHandle),
+      [
+        ?_assertEqual(
+          {ok, <<"05fe405753166f125559e7c9ac558654f107c7e9">>, <<0:8/unit:8>>},
+          Result1
+        ),
+        ?_assertEqual(
+            {error, einval},
+            craterl_hash:hashOpenFile(FileHandle, crypto:hash_init(sha), <<>>)
+        )
+      ]
+    end
+  )
+}.

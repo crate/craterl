@@ -52,6 +52,59 @@ teardown_get_blob_to_file(FileName) ->
   teardown_mecks(nothing),
   file:delete(FileName).
 
+setup_blob_put() ->
+  meck:new(hackney),
+  meck:expect(hackney, request, 5,
+    meck:seq([
+      {ok, make_ref()},
+      {ok, make_ref()},
+      {error, closed},
+      {ok, make_ref()}
+    ])),
+  meck:expect(hackney, send_body, 2,
+    meck:seq([
+      ok,
+      ok,
+      ok
+    ])),
+  meck:expect(hackney, start_response, 1,
+    meck:seq([
+      {ok, 201, [], make_ref()},
+      {ok, 409, [], make_ref()},
+      {ok, 404, [], make_ref()}
+    ])),
+  ok.
+
+
+blob_put_test_() ->
+  {
+    "test putting blobs to the server",
+    {
+      setup,
+      fun setup_blob_put/0,
+      fun teardown_mecks/1,
+      fun (_) ->
+        [
+          ?_assertEqual(
+              {ok, {created, <<"123456">>}},
+              craterl_blob:blob_put({<<"localhost">>, 4300}, <<"myblobs">>, <<"123456">>, {data, <<"foobar">>})
+          ),
+          ?_assertEqual(
+              {error, {already_exists, <<"123456">>}},
+              craterl_blob:blob_put({<<"localhost">>, 4300}, <<"myblobs">>, <<"123456">>, {data, <<"foobar">>})
+          ),
+          ?_assertEqual(
+            {error, closed},
+            craterl_blob:blob_put({<<"localhost">>, 4300}, <<"myblobs">>, <<"1234567">>, {data, <<"foobar">>})
+          ),
+          ?_assertEqual(
+            {error, {not_found, <<"noblobs">>}},
+            craterl_blob:blob_put({<<"localhost">>, 4300}, <<"noblobs">>, <<"1234567">>, {data, <<"foobar">>})
+          )
+        ]
+      end
+    }
+  }.
 
 blob_get_to_mem_test_() ->
   {
@@ -189,6 +242,11 @@ blob_request_test_() ->
         ?_assertEqual({ok, deleted}, craterl_blob:blob_request(
           #blob_request{method=delete, table = <<"myblobs">>, digest = <<"123456">>},
           {<<"localhost">>, 9200})
+        ),
+        ?_assertEqual({error, unsupported},
+          craterl_blob:blob_request(
+            #blob_request{method=poop,table = <<"myblobs">>, digest = <<"123456">>},
+            {<<"localhost">>, 1234})
         )
       ]
     end

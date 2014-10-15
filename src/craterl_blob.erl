@@ -61,41 +61,38 @@ blob_request(#blob_request{method=Method, table=Table, digest=Digest, payload=Pa
 
 -spec blob_put(craterl_server_spec(), binary(), binary(), binary()) -> {ok, {created, binary()}} | {error, term()}.
 blob_put(ServerSpec, Table, Digest, Payload) when is_binary(Table) and is_binary(Digest) ->
-  case craterl_url:create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>) of
-    {error, Reason} -> {error, Reason};
-    Url ->
-      lager:debug("putting blob to ~p", [Url]),
-      case hackney:request(put,
-        Url,
-        [
-          {<<"Transfer-Encoding">>, <<"chunked">>}
-        ],
-        stream,
-        [{pool, crate}]
-      ) of
-        {ok, Client} ->
-          Body = case Payload of
-            {file, Path} -> {file, Path};
-            {data, Data} -> Data
-          end,
-          case hackney:send_body(Client, Body) of
-            ok ->
-              case hackney:start_response(Client) of
-                {ok, StatusCode, _RespHeaders, _ClientRef} ->
-                   case StatusCode of
-                     201 -> {ok, {created, Digest}};
-                     400 -> {error, {bad_request, Digest}};
-                     404 -> {error, {not_found, Digest}};
-                     409 -> {error, {already_exists, Digest}};
-                     _ -> {error, StatusCode}
-                   end;
-                {error, Reason} ->
-                  {error, Reason}
-              end;
-            {error, Reason} -> {error, Reason}
+  Url =  craterl_url:create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>),
+  lager:debug("putting blob to ~p", [Url]),
+  case hackney:request(put,
+    Url,
+    [
+      {<<"Transfer-Encoding">>, <<"chunked">>}
+    ],
+    stream,
+    [{pool, crate}]
+  ) of
+    {ok, Client} ->
+      Body = case Payload of
+        {file, Path} -> {file, Path};
+        {data, Data} -> Data
+      end,
+      case hackney:send_body(Client, Body) of
+        ok ->
+          case hackney:start_response(Client) of
+            {ok, StatusCode, _RespHeaders, _ClientRef} ->
+               case StatusCode of
+                 201 -> {ok, {created, Digest}};
+                 400 -> {error, {bad_request, Digest}};
+                 404 -> {error, {not_found, Table}};
+                 409 -> {error, {already_exists, Digest}};
+                 _ -> {error, StatusCode}
+               end;
+            {error, Reason} ->
+              {error, Reason}
           end;
-          {error, Reason} -> {error, Reason}
-      end
+        {error, Reason} -> {error, Reason}
+      end;
+      {error, Reason} -> {error, Reason}
   end.
 
 -spec blob_get_to_mem(craterl_server_spec(), binary(), binary()) -> {ok, fun(()-> {ok, binary() | done})}.

@@ -25,6 +25,10 @@
 -module(craterl_hash).
 -author("mat").
 
+-ifdef(TEST).
+-compile(export_all).
+-endif.
+
 %% API
 -export([sha1Hex/1, sha1HexFile/1, sha1HexFileData/1]).
 

@@ -71,7 +71,7 @@
 start_link(ClientSpec, Servers, Options) ->
   gen_server:start_link(ClientSpec, ?MODULE, [{servers, Servers}, {options, Options}], []).
 
--spec get_server(atom()) -> {ok, craterl_server_spec()}.
+-spec get_server(atom()) -> {ok, craterl_server_spec()} | none_active.
 get_server(ClientName) ->
     gen_server:call(ClientName, get_server).
 

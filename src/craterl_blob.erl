@@ -38,10 +38,9 @@
 -include("craterl.hrl").
 -compile([{parse_transform, lager_transform}]).
 
-
 %%% API %%%
 
--spec blob_request(blob_request(), craterl_server_spec()) -> {ok, term()}.
+-spec blob_request(blob_request(), craterl_server_spec()) -> {ok, term()} | {error, term()}.
 blob_request(#blob_request{method=Method, table=Table, digest=Digest, payload=Payload}, ServerSpec) ->
   Response = case Method of
     get ->
@@ -59,7 +58,7 @@ blob_request(#blob_request{method=Method, table=Table, digest=Digest, payload=Pa
 
 %%% INTERNAL %%%
 
--spec blob_put(craterl_server_spec(), binary(), binary(), binary()) -> {ok, {created, binary()}} | {error, term()}.
+-spec blob_put(craterl_server_spec(), binary(), binary(), blob_payload()) -> {ok, {created, binary()}} | {error, term()}.
 blob_put(ServerSpec, Table, Digest, Payload) when is_binary(Table) and is_binary(Digest) ->
   Url =  craterl_url:create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>),
   lager:debug("putting blob to ~p", [Url]),
@@ -152,18 +151,15 @@ stream_blob_to_file(ClientRef, FileHandle) ->
 -spec execute_blob_request(craterl_server_spec(), atom(), binary(), binary(), fun((hackney:client_ref()) -> term()))  -> term().
 execute_blob_request(ServerSpec, Method, Table, Digest, HandleBodyFun) when is_function(HandleBodyFun)
                                                                 and is_atom(Method) ->
-  case craterl_url:create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>) of
-    {error, Reason} -> {error, Reason};
-    Url ->
-      lager:debug("blob request to ~p", [Url]),
-      Headers = [],
-      Options = [{pool, crate}],
-      case hackney:request(Method, Url, Headers, <<>>, Options) of
-        {ok, StatusCode, _RespHeaders, ClientRef} ->
-          case StatusCode of
-              Code when Code < 400 -> HandleBodyFun(ClientRef);
-              _ -> {error, StatusCode}
-          end;
-        {error, Reason} -> {error, Reason}
-      end
+  Url = craterl_url:create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>),
+  lager:debug("blob request to ~p", [Url]),
+  Headers = [],
+  Options = [{pool, crate}],
+  case hackney:request(Method, Url, Headers, <<>>, Options) of
+    {ok, StatusCode, _RespHeaders, ClientRef} ->
+      case StatusCode of
+          Code when Code < 400 -> HandleBodyFun(ClientRef);
+          _ -> {error, StatusCode}
+      end;
+    {error, Reason} -> {error, Reason}
   end.

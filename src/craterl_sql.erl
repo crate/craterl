@@ -41,7 +41,8 @@
 
 %%% API %%%
 
--spec sql_request(sql_request(), craterl_server_spec()) -> {ok, sql_response()} | {error, term()}.
+-spec sql_request(sql_request(), craterl_server_spec()) -> {ok, sql_response()} | {error, term()};
+    (sql_bulk_request(), craterl_server_spec()) -> {ok, sql_bulk_response()} | {error, term()}.
 sql_request(#sql_request{stmt=Stmt, args=Args, includeTypes=IncludeTypes}, ServerSpec) ->
   sql_request(Stmt, Args, IncludeTypes, ServerSpec);
 sql_request(#sql_bulk_request{stmt=Stmt, bulk_args=BulkArgs, includeTypes = IncludeTypes}, ServerSpec) ->

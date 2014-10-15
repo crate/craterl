@@ -82,8 +82,8 @@ init([]) ->
 -spec client_name(ClientSpec:: craterl_client_spec()) -> atom().
 client_name(ClientSpec) ->
   case ClientSpec of
-     {local, Name} -> Name;
-     {global, Name} -> Name;
+     {local, Name} when is_atom(Name) -> Name;
+     {global, Name} when is_atom(Name) -> Name;
      {via, _Module, Name} when is_atom(Name) -> Name;
      Name when is_atom(Name) -> Name
   end.

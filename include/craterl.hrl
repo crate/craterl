@@ -50,7 +50,7 @@
 
 -type craterl_client_spec() :: {local, atom()} | {global, atom()} | {via, atom(), atom()}.
 
--type craterl_server_spec() :: binary().
+-type craterl_server_spec() :: {binary(), non_neg_integer()}.
 
 -record(sql_request, {
         stmt :: binary(),
@@ -95,11 +95,12 @@
 }).
 -type sql_error() :: #sql_error{}.
 
+-type blob_payload() :: {data, binary()} | {file, binary()} | undefined.
 -record(blob_request, {
     method :: atom(),
     table :: binary(),
     digest :: binary(),
-    payload=undefined :: binary()
+    payload :: blob_payload()
 }).
 -type blob_request() :: #blob_request{}.
 

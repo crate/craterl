@@ -79,16 +79,13 @@ new(ClientSpec, Servers, Options) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec sql(Stmt::binary()|string()) -> {ok, sql_response()};
-    (Request::sql_request())  -> {ok, sql_response()};
-    (term()) -> {error, unsupported}.
+-spec sql(binary()|string()|sql_request()) -> {ok, sql_response()}.
 sql(Stmt) when is_binary(Stmt) ->
     sql(Stmt, []);
 sql(Stmt) when is_list(Stmt) ->
     sql(list_to_binary(Stmt), []);
 sql(Request = #sql_request{}) ->
-    sql(?MODULE, Request);
-sql(_) -> {error, unsupported}.
+    sql(?MODULE, Request).
 
 
 %%--------------------------------------------------------------------
@@ -210,11 +207,11 @@ blob_get(ClientName, BlobTable, HexDigest) ->
   execute_request(ClientName, Request, SuccessFun).
 
 
--spec blob_get_to_file(BlobTable::binary(), HexDigest::binary(), FilePath::iolist()) -> {ok, binary()}.
+-spec blob_get_to_file(BlobTable::binary(), HexDigest::binary(), FilePath::binary()) -> {ok, binary()}.
 blob_get_to_file(BlobTable, HexDigest, FilePath) ->
   blob_get_to_file(?MODULE, BlobTable, HexDigest, FilePath).
 
--spec blob_get_to_file(ClientName::atom(), BlobTable::binary(), HexDigest::binary(), FilePath::iolist()) -> {ok, binary()}.
+-spec blob_get_to_file(ClientName::atom(), BlobTable::binary(), HexDigest::binary(), FilePath::binary()) -> {ok, binary()}.
 blob_get_to_file(ClientName, BlobTable, HexDigest, FilePath) ->
   Request = #blob_request{
                method=get,
@@ -268,7 +265,7 @@ blob_put_file(ClientName, BlobTable, FilePath) ->
 
 %%% INTERNAL %%%
 
--spec send_blob(atom(), binary(), binary(), binary()) -> {ok, created, binary()} | {error, invalud_response, term()}.
+-spec send_blob(atom(), binary(), binary(), blob_payload()) -> {ok, created, binary()} | {error, term()}.
 send_blob(ClientName, BlobTable, HexDigest, Payload) ->
   Request = #blob_request{
                method=put,
@@ -290,6 +287,8 @@ execute_request(ClientName, Request, SuccessFun) when is_function(SuccessFun) ->
           {error, "No active server"};
       {ok, Server} ->
         case execute_request_on_server(Request, Server, SuccessFun) of
+          {error, SqlError=#sql_error{}} ->
+            {error, SqlError};
           {error, Reason} ->
             craterl_gen_server:add_inactive(ClientName, Server),
             {error, Reason};
@@ -299,7 +298,7 @@ execute_request(ClientName, Request, SuccessFun) when is_function(SuccessFun) ->
 
 -spec execute_request_on_server(sql_request(), craterl_server_spec(), fun()) -> {ok, sql_response()} | {error, term()};
                                (sql_bulk_request(), craterl_server_spec(), fun()) -> {ok, sql_bulk_response()} | {error, term()};
-                               (blob_request(), craterl_server_spec(), fun()) -> ok|{ok, sql_response()} | {error, term()}.
+                               (blob_request(), craterl_server_spec(), fun()) -> ok|{ok, term()} | {error, term()}.
 execute_request_on_server(Request=#sql_request{}, Server, SuccessFun) ->
   case craterl_sql:sql_request(Request, Server) of
     {ok, Response=#sql_response{}} -> SuccessFun(Response);

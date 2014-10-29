@@ -22,7 +22,7 @@
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
--module(blob_tests).
+-module(craterl_blob_tests).
 -author("mat").
 
 -include("craterl.hrl").

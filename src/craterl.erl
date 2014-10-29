@@ -32,6 +32,7 @@
 -export([
   start/0,
   new/0, new/1, new/2, new/3,
+  stop_client/1,
   sql/1, sql/2, sql/3, sql/4,
   sql_bulk/1, sql_bulk/2, sql_bulk/3, sql_bulk/4,
   blob_get/2, blob_get/3,
@@ -52,24 +53,29 @@ start_deps(App, Type) ->
     {error, {not_started, Dep}} ->
       start_deps(Dep, Type),
       start_deps(App, Type);
+    {error, {already_started, _Dep}} -> ok;
     ok -> ok
   end.
 
--spec new() -> atom().
+-spec new() -> craterl_client_spec().
 new() ->
   new(?DEFAULT_CLIENT_SPEC, [?CRATERL_DEFAULT_SERVER], []).
 
--spec new([craterl_server_spec()]) -> atom().
+-spec new([craterl_server_spec()]) -> craterl_client_spec().
 new(Servers) ->
   new(?DEFAULT_CLIENT_SPEC, Servers, []).
 
--spec new([craterl_server_spec()], [term()]) -> atom().
+-spec new([craterl_server_spec()], [term()]) -> craterl_client_spec().
 new(Servers, Options) when is_list(Options) ->
   new(?DEFAULT_CLIENT_SPEC, Servers, Options).
 
--spec new(ClientSpec:: craterl_client_spec(), Servers::[craterl_server_spec()], Options::[term()]) -> atom().
+-spec new(ClientSpec:: craterl_client_spec(), Servers::[craterl_server_spec()], Options::[term()]) -> craterl_client_spec().
 new(ClientSpec, Servers, Options) ->
   craterl_sup:start_client(ClientSpec, Servers, Options).
+
+-spec stop_client(ClientName::atom()) -> ok | {error, term()}.
+stop_client(ClientName) when is_atom(ClientName) ->
+  craterl_sup:stop_client(ClientName).
 
 
 %%--------------------------------------------------------------------
@@ -96,17 +102,17 @@ sql(Request = #sql_request{}) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec sql(Stmt::binary()|string(), Args::list())      -> {ok, sql_response()};
-         (ClientName::atom(), Request::sql_request()) -> {ok, sql_response()}.
+         (ClientSpec::craterl_client_spec(), Request::sql_request()) -> {ok, sql_response()}.
 sql(Stmt, Args) when is_list(Stmt) and is_list(Args) ->
     sql(list_to_binary(Stmt), Args, false);
 sql(Stmt, Args) when is_binary(Stmt) and is_list(Args) ->
     sql(Stmt, Args, false);
-sql(ClientName, Request = #sql_request{}) when is_atom(ClientName) ->
-    SuccessFun = fun
-    (SqlResponse = #sql_response{}) -> {ok, SqlResponse};
-    (Response) -> {error, {invalid_response, Response}}
+sql(ClientSpec, Request = #sql_request{}) ->
+   SuccessFun = fun
+     (SqlResponse = #sql_response{}) -> {ok, SqlResponse};
+     (Response) -> {error, {invalid_response, Response}}
    end,
-   execute_request(ClientName, Request, SuccessFun).
+   execute_request(ClientSpec, Request, SuccessFun).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -127,9 +133,9 @@ sql(Stmt, Args, IncludeTypes) when is_binary(Stmt) and is_list(Args) and is_bool
 %% to a specific client.
 %% @end
 %%--------------------------------------------------------------------
--spec sql(ClientName::atom(), Stmt::binary()|string(), Args::list(), IncludeTypes::boolean()) -> {ok, sql_response()}.
-sql(ClientName, Stmt, Args, IncludeTypes) ->
-   sql(ClientName, #sql_request{stmt=Stmt, args=Args, includeTypes = IncludeTypes}).
+-spec sql(ClientSpec::atom(), Stmt::binary()|string(), Args::list(), IncludeTypes::boolean()) -> {ok, sql_response()}.
+sql(ClientSpec, Stmt, Args, IncludeTypes) ->
+   sql(ClientSpec, #sql_request{stmt=Stmt, args=Args, includeTypes = IncludeTypes}).
 
 
 %%--------------------------------------------------------------------
@@ -157,7 +163,7 @@ sql_bulk(BulkRequest=#sql_bulk_request{}) ->
 sql_bulk(ClientName, BulkRequest=#sql_bulk_request{}) ->
   SuccessFun = fun
     (SqlBulkResponse = #sql_bulk_response{}) -> {ok, SqlBulkResponse};
-    (Response) -> {error, {invalid_respone, Response}}
+    (Response) -> {error, {invalid_response, Response}}
   end,
   execute_request(ClientName, BulkRequest, SuccessFun);
 sql_bulk(Stmt, BulkArgs) when is_list(Stmt) ->
@@ -301,12 +307,12 @@ execute_request(ClientName, Request, SuccessFun) when is_function(SuccessFun) ->
                                (blob_request(), craterl_server_spec(), fun()) -> ok|{ok, term()} | {error, term()}.
 execute_request_on_server(Request=#sql_request{}, Server, SuccessFun) ->
   case craterl_sql:sql_request(Request, Server) of
-    {ok, Response=#sql_response{}} -> SuccessFun(Response);
+    {ok, Response} -> SuccessFun(Response);
     Other -> Other
   end;
 execute_request_on_server(Request=#sql_bulk_request{}, Server, SuccessFun) ->
   case craterl_sql:sql_request(Request, Server) of
-    {ok, Response=#sql_bulk_response{}} -> SuccessFun(Response);
+    {ok, Response} -> SuccessFun(Response);
     Other -> Other
   end;
 execute_request_on_server(Request=#blob_request{}, Server, SuccessFun) ->

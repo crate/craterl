@@ -42,10 +42,11 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
--spec start_client(craterl_client_spec(), Servers::[craterl_server_spec()], Options::[term()]) -> atom().
+-spec start_client(ClientSpec::craterl_client_spec(), Servers::[craterl_server_spec()], Options::[term()]) -> atom().
 start_client(ClientSpec, Servers, Options) ->
-  {ok, _ChildPid} = supervisor:start_child(?MODULE, {
-    ClientSpec,
+  ClientName = client_name(ClientSpec),
+  case supervisor:start_child(?MODULE, {
+    ClientName,
     {
       craterl_gen_server, start_link, [ClientSpec, Servers, Options]
     },
@@ -53,12 +54,16 @@ start_client(ClientSpec, Servers, Options) ->
     5000,
     worker,
     [craterl_gen_server]
-  }),
-  client_name(ClientSpec).
+  }) of
+    {ok, _ChildPid} ->
+      ClientName;
+    {error, {already_started, _Pid}} -> {error, {already_started, client_name(ClientSpec)}}
+  end.
 
 -spec stop_client(atom()) -> ok | {error, term()}.
 stop_client(ClientName) ->
-  supervisor:terminate_child(?MODULE, ClientName).
+  supervisor:terminate_child(?MODULE, ClientName),
+  supervisor:delete_child(?MODULE, ClientName).
 
 
 %% ===================================================================

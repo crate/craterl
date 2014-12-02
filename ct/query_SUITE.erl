@@ -33,10 +33,14 @@
 	 init_per_suite/1, end_per_suite/1,
 	 init_per_testcase/2, end_per_testcase/2]).
 
--export([simple_query_test_binary/1, simple_query_test_str/1]).
+-export([
+  simple_query_test_binary/1,
+  simple_query_test_str/1,
+  bulk_query_test/1
+]).
 
 all() ->
-  [simple_query_test_str, simple_query_test_binary].
+  [simple_query_test_str, simple_query_test_binary, bulk_query_test].
 
 init_per_suite(Config) ->
   ok = craterl:start(),
@@ -50,8 +54,17 @@ end_per_suite(Config) ->
   application:stop(craterl),
   Config.
 
+init_per_testcase(bulk_query_test, Config) ->
+  Client = ?config(client, Config),
+  {ok, #sql_response{} = _SqlResponse} = craterl:sql(Client, <<"create table test (id int primary key, name string) with (number_of_replicas=0)">>, [], true),
+  ct_helpers:wait_for_green_state(<<"localhost:48200">>),
+  Config;
 init_per_testcase(_, Config) ->
   Config.
+end_per_testcase(bulk_query_test, Config) ->
+  Client = ?config(client, Config),
+  {ok, #sql_response{} = _SqlResponse} = craterl:sql(Client, <<"drop table test">>, [], true),
+  Config;
 end_per_testcase(_, Config) ->
   Config.
 
@@ -65,3 +78,12 @@ simple_query_test_binary(_Config) ->
 simple_query_test_str(_Config) ->
   {ok, #sql_response{cols=[<<"id">>,<<"name">>,<<"master_node">>, <<"settings">>]}} = craterl:sql("select * from sys.cluster").
 
+bulk_query_test(Config) ->
+  Client = ?config(client, Config),
+  {ok, #sql_bulk_response{results = Results}} = craterl:sql_bulk(Client, <<"insert into test (id, name) values (?, ?)">>, [[1, <<"Ford">>], [2, <<"Trillian">>], [3, <<"Zaphod">>]], true),
+  3 = length(Results),
+  SumFun = fun (#sql_bulk_result{rowCount = RowCount}, Acc) -> Acc + RowCount end,
+  3 = lists:foldl(SumFun, 0, Results),
+  {ok, #sql_bulk_response{results = Results2}} = craterl:sql_bulk(Client, <<"insert into test (id, name) values (?, ?)">>, [[1, <<"Ford">>], [2, <<"Trillian">>], [3, <<"Zaphod">>]], true),
+  3 = length(Results2),
+  [-2, -2, -2] = lists:map(fun(#sql_bulk_result{rowCount = RowCount}) -> RowCount end, Results2).  % -2 means failure

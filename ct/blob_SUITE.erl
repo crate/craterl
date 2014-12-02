@@ -76,18 +76,9 @@ init_per_testcase(_, Config) ->
   BlobTable = <<"mytable">>,
   craterl:sql(list_to_binary([<<"drop blob table ">>, BlobTable])),
   craterl:sql(list_to_binary([<<"create blob table ">>, BlobTable, <<" with (number_of_replicas=0)">>])),
-  wait_for_blob_table(BlobTable),
-  wait_for_blob_table(BlobTable),
+  ct_helpers:wait_for_green_state(<<"localhost:48200">>),
   [{big_blob, BigBlobFile},{small_blob, SmallBlobFile}, {table, BlobTable}] ++ Config.
 
-wait_for_blob_table(Table) ->
-  case craterl:blob_exists(Table, <<"does not exist">>) of
-    {error, 404} -> ok;
-    {error, 502} ->
-      receive
-        after 100 -> wait_for_blob_table(Table)
-      end
-  end.
 
 end_per_testcase(_, Config) ->
   file:delete(?config(big_blob, Config)),
@@ -110,31 +101,6 @@ blob_put_small_file_roundtrip_test(Config) ->
   {error, 404} = craterl:blob_delete(Table, Hash).
 
 
-get_blob_content(DataFun) ->
-  get_blob_content(DataFun, <<>>, 0).
-get_blob_content(DataFun, Acc, Calls) ->
-  case DataFun() of
-    {ok, done} -> {Acc, Calls};
-    {ok, Content} when is_binary(Content) ->
-      get_blob_content(DataFun, <<Content/binary, Acc/binary>>, Calls+1)
-  end.
-validate_blob_content(DataFun, ExpectedContent, ExpectedCalls) ->
-  validate_blob_content(DataFun, ExpectedContent, ExpectedCalls, 0, 0).
-validate_blob_content(DataFun, ExpectedContent, ExpectedCalls, Calls, Pos) ->
-  case DataFun() of
-    {ok, done} -> ok;
-    {ok, Content} ->
-      ByteSize = byte_size(Content),
-      ExpectedPart = binary:part(ExpectedContent, Pos, ByteSize),
-      if Content /= ExpectedPart ->
-        ct:print("Expected: ~p~n", [ExpectedPart]),
-        ct:print("Got: ~p~n", [Content]);
-        true -> ok
-      end,
-      validate_blob_content(DataFun, ExpectedContent, ExpectedCalls, Calls+1, Pos+ByteSize)
-  end.
-
-
 blob_put_big_file_roundtrip_test(Config) ->
   ClientRef = ?config(client, Config),
   Table = ?config(table, Config),
@@ -145,7 +111,7 @@ blob_put_big_file_roundtrip_test(Config) ->
   ok = craterl:blob_exists(ClientRef, Table, Hash),
   {ok, DataFun} = craterl:blob_get(Table, Hash),
   {ok, FileContent} = file:read_file(BigBlobFile),
-  {BlobContent, NumCalls} = get_blob_content(DataFun),
+  {BlobContent, NumCalls} = ct_helpers:get_blob_content(DataFun),
   BlobContent = FileContent,
   NumCalls = 3558,
   ok = craterl:blob_delete(Table, Hash),
@@ -178,7 +144,7 @@ blob_put_big_roundtrip_test(Config) ->
   {ok, {created, Hash}} = craterl:blob_put(Table, BlobContent),
   ok = craterl:blob_exists(ClientRef, Table, Hash),
   {ok, DataFun} = craterl:blob_get(Table, Hash),
-  validate_blob_content(DataFun, BlobContent, 3558),
+  ct_helpers:validate_blob_content(DataFun, BlobContent, 3558),
   ok = craterl:blob_delete(Table, Hash),
   {error, 404} = craterl:blob_exists(ClientRef, Table, Hash),
   {error, 404} = craterl:blob_delete(Table, Hash).

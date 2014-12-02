@@ -11,7 +11,7 @@ not yet verified to be rock-solid in a production environment.
 
 ## Compatibility ##
 
-Tested with Erlang ``R16B03-1`` and ``17.``.
+Tested with Erlang ``R16B03-1`` and ``17``.
 
 ## Installation ##
 
@@ -41,7 +41,7 @@ Options = [{poolsize, 1000}, {timeout, 5000}].
 ClientRef = craterl:new(ClientSpec, Servers, Options).
 ```
 
-It is possible to create many clients on one erlang node. 
+It is possible to create many clients on one erlang node.
 ```craterl``` client instances are created using a client spec which is
 a tuple you would use when registering a process, like ```{local, your_name}```.
 The process name, ```your_name``` in this example, must be unique on a node.
@@ -53,12 +53,12 @@ See the documentation of the ```craterl``` module for more detailed api document
 Issuing SQL statements using craterl is possible with one of the variants of ```craterl:sql()```:
 
 ```erlang
-{o, Response} = craterl:sql("select id, name from sys.cluster").
+{ok Response} = craterl:sql("select id, name from sys.cluster").
 {ok, #sql_response{cols = [<<"id">>,<<"name">>],
                   colTypes = [],
                   rows = [[<<"89b8f6bf-4082-415b-937e-7de66b67f6fe">>,
                            <<"crate">>]],
-                  rowCount = 1,duration = 12}}             
+                  rowCount = 1,duration = 12}}
 {ok, Response2} = craterl:sql(ClientRef, <<"select * from user where id in (?, ?, ?)">>, [1, 2, 3]).
 Request = #sql_request{stmt = <<"select count(*) from sys.nodes">>}.
 #sql_request{stmt = <<"select count(*) from sys.nodes">>,
@@ -124,14 +124,13 @@ HashDigest = <<"040f06fd774092478d450774f5ba30c5da78acc8">>.
 
 File = <<"/usr/share/dict/words">>
 {ok,{created, Hash}} = craterl:blob_put_file(ClientRef, <<"myblobs">>, <<"/usr/share/dict/words">>).
-Hash = <<"a62edf8685920f7d5a95113020631cdebd18a185">>.
+WordsHash = <<"a62edf8685920f7d5a95113020631cdebd18a185">>.
 ```
 
 You can get blobs to memory or to file. Both method will make use of chunked HTTP
 encoding so you will receive the blob piece by piece and won't load big blobs into memory at once.
 
 ```erlang
-WordsHash = <<"a62edf8685920f7d5a95113020631cdebd18a185">>.
 {ok, GetDataFun} = craterl:blob_get(<<"myblobs">>, WordsHash).
 GetDataFun()
 {ok,<<"A\na\naa\naal\naalii\naam\nAani\naardvark\naardwolf\nAaron\nAaronic\nAaronical\nAaronite\nAaronitic\nAaru\nAb\naba\nAbabdeh\nA"...>>}

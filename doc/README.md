@@ -24,7 +24,7 @@ with Crate these terms will supersede the license and you may use the
 software solely pursuant to the terms of the relevant commercial agreement.
 
 
-__Version:__ 0.1.0
+__Version:__ 0.1.1
 
 __Authors:__ Matthias Wahl ([`matthias@crate.io`](mailto:matthias@crate.io)), Peter Sabaini ([`peter@sabaini.at`](mailto:peter@sabaini.at)).
 Craterl is the erlang client for the crate datastore.

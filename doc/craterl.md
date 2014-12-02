@@ -459,7 +459,7 @@ or a prebuilt #sql_request{} to a specific client
 
 
 <pre><code>
-sql(Stmt::binary() | string(), Args::list(), IncludeTypes::boolean()) -&gt; {ok, <a href="#type-sql_response">sql_response()</a>}
+sql(Stmt::binary(), Args::list(), IncludeTypes::boolean()) -&gt; {ok, <a href="#type-sql_response">sql_response()</a>}
 </code></pre>
 
 <br></br>
@@ -475,7 +475,7 @@ for the returned columns.
 
 
 <pre><code>
-sql(ClientSpec::atom(), Stmt::binary() | string(), Args::list(), IncludeTypes::boolean()) -&gt; {ok, <a href="#type-sql_response">sql_response()</a>}
+sql(ClientSpec::atom(), Stmt::binary(), Args::list(), IncludeTypes::boolean()) -&gt; {ok, <a href="#type-sql_response">sql_response()</a>}
 </code></pre>
 
 <br></br>

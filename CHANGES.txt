@@ -2,6 +2,11 @@
 CHANGES for craterl
 ===================
 
+2014/12/02 0.1.1
+================
+
+ - Fix: fix building bulk results when using sql bulk requests
+
 2014/12/02 0.1.0
 ================
 

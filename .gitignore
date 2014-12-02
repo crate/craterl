@@ -1,9 +1,10 @@
 /ebin/
-.eunit
+/.eunit/
 /.idea/
 /deps/
 /log/
 /ct/logs/
+/.concrete/
 *.o
 *.beam
 *.plt

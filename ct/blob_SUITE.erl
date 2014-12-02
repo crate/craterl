@@ -75,12 +75,19 @@ init_per_testcase(_, Config) ->
 
   BlobTable = <<"mytable">>,
   craterl:sql(list_to_binary([<<"drop blob table ">>, BlobTable])),
-  craterl:sql(list_to_binary([<<"create blob table ">>, BlobTable, <<" with (number_of_replicas=0)">>] )),
-  receive
-    after 100 -> ok
-  end,
+  craterl:sql(list_to_binary([<<"create blob table ">>, BlobTable, <<" with (number_of_replicas=0)">>])),
+  wait_for_blob_table(BlobTable),
+  wait_for_blob_table(BlobTable),
   [{big_blob, BigBlobFile},{small_blob, SmallBlobFile}, {table, BlobTable}] ++ Config.
 
+wait_for_blob_table(Table) ->
+  case craterl:blob_exists(Table, <<"does not exist">>) of
+    {error, 404} -> ok;
+    {error, 502} ->
+      receive
+        after 100 -> wait_for_blob_table(Table)
+      end
+  end.
 
 end_per_testcase(_, Config) ->
   file:delete(?config(big_blob, Config)),

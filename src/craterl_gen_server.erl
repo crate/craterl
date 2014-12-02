@@ -121,11 +121,11 @@ handle_call(get_server, _From,
               config = Config}) ->
     case lookup_server(Connections) of
         none_active -> {reply, none_active, State};
-      {ok, Server, NewConnections} ->
-        {reply,
-          {ok, #craterl_server_conf{address = Server, config = Config}},
-          new_state(State, NewConnections)
-        }
+        {ok, Server, NewConnections} ->
+          {reply,
+            {ok, #craterl_server_conf{address = Server, config = Config}},
+            new_state(State, NewConnections)
+          }
     end;
 
 handle_call({set_servers, ServerList}, _From, State=#state{}) ->

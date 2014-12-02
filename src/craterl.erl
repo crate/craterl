@@ -180,7 +180,7 @@ sql(ClientSpec, Request = #sql_request{}) ->
 %% for the returned columns.
 %% @end
 %%--------------------------------------------------------------------
--spec sql(Stmt::binary()|string(), Args::list(), IncludeTypes::boolean()) -> {ok, sql_response()}.
+-spec sql(Stmt::binary(), Args::list(), IncludeTypes::boolean()) -> {ok, sql_response()}.
 sql(Stmt, Args, IncludeTypes) when is_binary(Stmt) and is_list(Args) and is_boolean(IncludeTypes) ->
   sql(?MODULE, #sql_request{stmt=Stmt, args=Args, includeTypes = IncludeTypes}).
 
@@ -192,7 +192,7 @@ sql(Stmt, Args, IncludeTypes) when is_binary(Stmt) and is_list(Args) and is_bool
 %% to a specific client.
 %% @end
 %%--------------------------------------------------------------------
--spec sql(ClientSpec::atom(), Stmt::binary()|string(), Args::list(), IncludeTypes::boolean()) -> {ok, sql_response()}.
+-spec sql(ClientSpec::atom(), Stmt::binary(), Args::list(), IncludeTypes::boolean()) -> {ok, sql_response()}.
 sql(ClientSpec, Stmt, Args, IncludeTypes) ->
    sql(ClientSpec, #sql_request{stmt=Stmt, args=Args, includeTypes = IncludeTypes}).
 

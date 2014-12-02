@@ -113,7 +113,7 @@ build_response(Body) when is_binary(Body) ->
             duration = Duration
           };
         Results -> #sql_bulk_response{
-            results = Results,
+            results = build_bulk_results(Results),
             cols = Columns,
             colTypes = ColumnTypes,
             duration = Duration
@@ -123,6 +123,17 @@ build_response(Body) when is_binary(Body) ->
   catch
     error:badarg -> {error, invalid_json}
   end.
+
+-spec build_bulk_results(list()) -> [sql_bulk_result()].
+build_bulk_results(RawResults) ->
+  build_bulk_results(RawResults, []).
+build_bulk_results([], Acc) -> Acc;
+build_bulk_results([Hd|Tail], Acc) ->
+  Result = #sql_bulk_result{
+    rowCount = proplists:get_value(<<"rowcount">>, Hd),
+    errorMessage = proplists:get_value(<<"error_message">>, Hd)
+  },
+  build_bulk_results(Tail, [Result|Acc]).
 
 
 -spec build_error_response(binary()) -> sql_error() | {error, invalid_json}.

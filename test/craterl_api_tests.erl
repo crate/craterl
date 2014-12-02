@@ -36,7 +36,7 @@ setup() ->
   meck:new(craterl_sql),
   meck:expect(craterl_sql, sql_request,
     fun
-      (#sql_request{args = Args, includeTypes = IncludeTypes}, {Host, Port}) ->
+      (#sql_request{args = Args, includeTypes = IncludeTypes}, #craterl_server_conf{address = {Host, Port}, config=_Config}) ->
         %% return the args as a single row
         case Args of
           [error] -> {error, bla};
@@ -44,7 +44,7 @@ setup() ->
           [sql_error] -> {error, #sql_error{message = <<"oops">>, code=5000}};
            _ -> {ok, #sql_response{rowCount = 1, rows = [[Args, Host, Port, IncludeTypes]]}}
         end;
-      (#sql_bulk_request{bulk_args = BulkArgs, includeTypes = IncludeTypes}, _ServerSpec) ->
+      (#sql_bulk_request{bulk_args = BulkArgs, includeTypes = IncludeTypes}, _ServerConf) ->
         %% return the length of the bulk args in a single result
         case BulkArgs of
           [[error]] -> {error, bla};
@@ -62,12 +62,62 @@ setup() ->
   meck:new(craterl_blob),
   meck:expect(craterl_blob, blob_request,
     fun
-      (_BlobRequest = #blob_request{}, _ServerSpec) ->
-        {ok, <<"123456">>}
+      (_BlobRequest = #blob_request{method = get, payload = {file, FilePath}}, _ServerConf) ->
+        % blog_get_to_file
+        case FilePath of
+          <<"error">> -> {ok, invalid};
+          _ ->
+            {ok, File} = file:open(FilePath, [write]),
+            file:write(File, <<"content">>),
+            {ok, FilePath}
+        end;
+      (_BlobRequest = #blob_request{method = get, digest = Digest}, _ServerConf) ->
+        % blob_get
+        case Digest of
+          <<"invalid">> -> {ok, invalid};
+          <<"error">> -> {error, bla};
+          _ -> {ok, fun() -> {ok, <<"content">>} end }
+        end;
+      (_BlobRequest = #blob_request{method = head, digest = Digest}, _ServerConf) ->
+        % blob_get
+        case Digest of
+          <<"invalid">> -> {ok, invalid};
+          <<"error">> -> {error, bla};
+          _ -> {ok, exists}
+        end;
+      (_BlobRequest = #blob_request{method = delete, digest = Digest}, _ServerConf) ->
+        % blob_get
+        case Digest of
+          <<"invalid">> -> {ok, invalid};
+          <<"error">> -> {error, bla};
+          _ -> {ok, deleted}
+        end;
+
+      (_BlobRequest = #blob_request{method = put, table = Table, payload = Payload}, _ServerConf) ->
+        case Payload of
+          {data, Content} ->
+            % blob_put
+            case Content of
+              <<"invalid">> -> {ok, bla};
+              _ ->
+                {ok, Hash} = craterl_hash:sha1Hex(Content),
+                {ok, {created, Hash}}
+            end;
+          {file, FilePath} ->
+            % blob put file
+            case Table of
+              <<"error">> -> {error, bla};
+              _ ->
+                {ok, Hash} = craterl_hash:sha1HexFile(FilePath),
+                {ok, {created, Hash}}
+            end
+        end
     end
   ),
-  io:format("~p~n", [setup_new()]),
-  ok.
+  setup_new(),
+  RandomPath2 = list_to_binary(integer_to_list(erlang:phash2(make_ref()))),
+  ok = file:write_file(RandomPath2, <<"content">>),
+  RandomPath2.
 
 teardown(Args) ->
   teardown_new(Args),
@@ -99,13 +149,20 @@ start_app_test_() -> {
   "test that starting crate works correctly",
   {
     setup,
-    fun () -> ok end,
+    fun () ->
+      application:stop(craterl),
+      application:stop(hackney),
+      application:stop(goldrush),
+      application:stop(lager),
+      ok
+    end,
     fun (_) ->
       application:stop(craterl),
       application:stop(hackney),
       application:stop(goldrush),
       application:stop(lager),
-      ok end,
+      ok
+    end,
     fun (_) ->
       [
         ?_assertEqual(ok, craterl:start()),
@@ -217,12 +274,6 @@ sql_test_() -> {
           {error, bla},
           craterl:sql(<<"select * from sys.cluster">>, [error], true) %% trigger error
         ),
-        ?_assertEqual(
-          {error, "No active server"},
-          craterl:sql(<<"select * from sys.cluster">>, [], true)
-        ),
-        ?_assertEqual(ok, craterl:stop_client(craterl)),
-        ?_assertEqual(craterl, craterl:new()),
         ?_assertEqual({error, #sql_error{message = <<"oops">>, code=5000}}, craterl:sql(<<"select * from sys.cluster">>, [sql_error])),
         ?_assertEqual({error, {invalid_response, invalid}}, craterl:sql(<<"select * from sys.cluster">>, [invalid_response]))
       ]
@@ -278,12 +329,6 @@ sql_bulk_test_() -> {
           craterl:sql_bulk(<<"select * from sys.cluster">>, [[error]], true) %% trigger error
         ),
         ?_assertEqual(
-          {error, "No active server"},
-          craterl:sql_bulk(<<"select * from sys.cluster">>, [[]])
-        ),
-        ?_assertEqual(ok, craterl:stop_client(craterl)),
-        ?_assertEqual(craterl, craterl:new()),
-        ?_assertEqual(
           {error, #sql_error{message = <<"oops">>, code = 5000}},
           craterl:sql_bulk(<<"select * from sys.cluster">>, [[sql_error]], true) %% trigger error
         ),
@@ -295,3 +340,46 @@ sql_bulk_test_() -> {
     end
   }
 }.
+
+
+blob_test_() -> {
+  "test that blob operations work correctly",
+  {
+    setup,
+    fun setup/0,
+    fun teardown/1,
+    fun (ContentFilePath) ->
+      ClientRef = craterl:new(),
+      {ok, Fun} = craterl:blob_get(<<"mytable">>, <<"123456">>),
+      {ok, Fun2} = craterl:blob_get(ClientRef, <<"blobtable">>, <<"123456">>),
+      RandomPath = list_to_binary(integer_to_list(erlang:phash2(make_ref()))),
+      [
+        ?_assertEqual({ok, <<"content">>}, Fun()),
+        ?_assertEqual({ok, <<"content">>}, Fun2()),
+
+        ?_assertEqual({error, {invalid_response, invalid}}, craterl:blob_get(<<"mytable">>, <<"invalid">>)), %% trigger error
+        ?_assertEqual({error, bla}, craterl:blob_get(<<"mytable">>, <<"error">>)), %% trigger error
+
+        ?_assertEqual({ok, {created, <<"040f06fd774092478d450774f5ba30c5da78acc8">>}}, craterl:blob_put(<<"mytable">>, <<"content">>)),
+        ?_assertEqual({error, {invalid_response, bla}}, craterl:blob_put(<<"mytable">>, <<"invalid">>)), %% trigger invalid response
+
+        ?_assertEqual({ok, RandomPath}, craterl:blob_get_to_file(<<"mytable">>, <<"12345">>, RandomPath)),
+        ?_assertEqual({ok, <<"content">>}, file:read_file(RandomPath)),
+        ?_assertEqual({error, {invalid_response, invalid}}, craterl:blob_get_to_file(<<"mytable">>, <<"12345">>, <<"error">>)),
+
+        ?_assertEqual(ok, craterl:blob_exists(<<"mytable">>, <<"12345">>)),
+        ?_assertEqual({error, bla}, craterl:blob_exists(<<"mytable">>, <<"error">>)),
+        ?_assertEqual({error, {invalid_response, invalid}}, craterl:blob_exists(<<"mytable">>, <<"invalid">>)),
+
+        ?_assertEqual({ok, {created, <<"040f06fd774092478d450774f5ba30c5da78acc8">>}}, craterl:blob_put_file(<<"mytable">>, ContentFilePath)),
+        ?_assertEqual({error, bla}, craterl:blob_put_file(<<"error">>, ContentFilePath)),
+        ?_assertEqual({error, enoent}, craterl:blob_put_file(<<"mytable">>, <<"does_not_exist">>)),
+
+        ?_assertEqual(ok, craterl:blob_delete(<<"mytable">>, <<"040f06fd774092478d450774f5ba30c5da78acc8">>)),
+        ?_assertEqual({error, {invalid_response, invalid}}, craterl:blob_delete(<<"mytable">>, <<"invalid">>))
+
+      ]
+    end
+  }
+}.
+

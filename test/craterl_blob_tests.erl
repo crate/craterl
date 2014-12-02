@@ -28,6 +28,12 @@
 -include("craterl.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
+test_server_conf() ->
+  #craterl_server_conf{
+    address={<<"localhost">>, 4300},
+    config = craterl_config:apply_defaults()
+  }.
+
 setup_blob() ->
   meck:new(hackney),
   meck:expect(hackney, request,
@@ -84,22 +90,26 @@ blob_put_test_() ->
       fun setup_blob_put/0,
       fun teardown_mecks/1,
       fun (_) ->
+        ServerConf = #craterl_server_conf{
+          address={<<"localhost">>, 4300},
+          config = craterl_config:apply_defaults()
+        },
         [
           ?_assertEqual(
               {ok, {created, <<"123456">>}},
-              craterl_blob:blob_put({<<"localhost">>, 4300}, <<"myblobs">>, <<"123456">>, {data, <<"foobar">>})
+              craterl_blob:blob_put(ServerConf, <<"myblobs">>, <<"123456">>, {data, <<"foobar">>})
           ),
           ?_assertEqual(
               {error, {already_exists, <<"123456">>}},
-              craterl_blob:blob_put({<<"localhost">>, 4300}, <<"myblobs">>, <<"123456">>, {data, <<"foobar">>})
+              craterl_blob:blob_put(ServerConf, <<"myblobs">>, <<"123456">>, {data, <<"foobar">>})
           ),
           ?_assertEqual(
             {error, closed},
-            craterl_blob:blob_put({<<"localhost">>, 4300}, <<"myblobs">>, <<"1234567">>, {data, <<"foobar">>})
+            craterl_blob:blob_put(ServerConf, <<"myblobs">>, <<"1234567">>, {data, <<"foobar">>})
           ),
           ?_assertEqual(
             {error, {not_found, <<"noblobs">>}},
-            craterl_blob:blob_put({<<"localhost">>, 4300}, <<"noblobs">>, <<"1234567">>, {data, <<"foobar">>})
+            craterl_blob:blob_put(ServerConf, <<"noblobs">>, <<"1234567">>, {data, <<"foobar">>})
           )
         ]
       end
@@ -114,7 +124,7 @@ blob_get_to_mem_test_() ->
       fun setup_blob/0,
       fun teardown_mecks/1,
       fun (_) ->
-        {ok, GetDataFun} = craterl_blob:blob_get_to_mem({<<"localhost">>, 4200}, <<"myblobs">>, <<"123456">>),
+        {ok, GetDataFun} = craterl_blob:blob_get_to_mem(test_server_conf(), <<"myblobs">>, <<"123456">>),
         {ok, FirstResult} = GetDataFun(),
         {ok, SecondResult} = GetDataFun(),
         [
@@ -133,7 +143,7 @@ blob_get_to_file_test_() ->
     fun setup_get_blob_to_file/0,
     fun teardown_get_blob_to_file/1,
     fun (FilePath) ->
-      {ok, FilePath} = craterl_blob:blob_get_to_file({<<"localhost">>, 4200}, <<"myblobs">>, <<"123456">>, FilePath),
+      {ok, FilePath} = craterl_blob:blob_get_to_file(test_server_conf(), <<"myblobs">>, <<"123456">>, FilePath),
       {ok, Content} = file:read_file(FilePath),
       io:format("~p~n", [Content]),
       [
@@ -152,7 +162,7 @@ blob_exists_test_() ->
     fun teardown_mecks/1,
     fun (_) ->
       [
-        ?_assertEqual({ok, exists}, craterl_blob:blob_exists({<<"localhost">>, 4200}, <<"myblobs">>, <<"123456">>))
+        ?_assertEqual({ok, exists}, craterl_blob:blob_exists(test_server_conf(), <<"myblobs">>, <<"123456">>))
       ]
     end
   }
@@ -167,7 +177,7 @@ blob_delete_test_() ->
     fun teardown_mecks/1,
     fun (_) ->
       [
-        ?_assertEqual({ok, deleted}, craterl_blob:blob_delete({<<"localhost">>, 4200}, <<"myblobs">>, <<"123456">>))
+        ?_assertEqual({ok, deleted}, craterl_blob:blob_delete(test_server_conf(), <<"myblobs">>, <<"123456">>))
       ]
     end
   }
@@ -212,13 +222,14 @@ blob_request_test_() ->
     fun setup_blob_request/0,
     fun teardown_mecks/1,
     fun (FilePath) ->
+      ServerConf = test_server_conf(),
       {ok, DataFun} = craterl_blob:blob_request(
                         #blob_request{method=get, table= <<"myblobs">>, digest= <<"123456">>},
-                        {<<"localhost">>, 4200}
+                        ServerConf
       ),
       {ok, CreatedPath} = craterl_blob:blob_request(
           #blob_request{method=get, table= <<"myblobs">>, digest= <<"123456">>, payload = {file, FilePath}},
-          {<<"localhost">>, 4200}
+          ServerConf
       ),
       [
         ?_assertEqual({ok, <<"content">>}, DataFun()),
@@ -226,27 +237,27 @@ blob_request_test_() ->
         ?_assertEqual({ok, <<"content">>}, file:read_file(CreatedPath)),
         ?_assertEqual({ok, exists}, craterl_blob:blob_request(
           #blob_request{method=head, table= <<"myblobs">>, digest= <<"123456">>},
-          {<<"localhost">>, 4200}
+          ServerConf
         )),
         ?_assertEqual({ok, {created, <<"123456">>}}, craterl_blob:blob_request(
           #blob_request{method=put, table = <<"myblobs">>, digest = <<"123456">>,
             payload = {data, <<"content">>}
-          }, {<<"localhost">>, 4200})),
+          }, ServerConf)),
         ?_assertEqual({ok, {created, <<"123456">>}}, craterl_blob:blob_request(
           #blob_request{method=put, table = <<"myblobs">>, digest = <<"123456">>,
-            payload = {file, FilePath}}, {<<"localhost">>, 4200})),
+            payload = {file, FilePath}}, ServerConf)),
         ?_assertEqual({error, bla}, craterl_blob:blob_request(
           #blob_request{method=put, table = <<"myblobs">>, digest = <<"123456">>,
             payload = <<"content">>
-          }, {<<"localhost">>, 9200})),
+          }, ServerConf)),
         ?_assertEqual({ok, deleted}, craterl_blob:blob_request(
           #blob_request{method=delete, table = <<"myblobs">>, digest = <<"123456">>},
-          {<<"localhost">>, 9200})
+          ServerConf)
         ),
         ?_assertEqual({error, unsupported},
           craterl_blob:blob_request(
             #blob_request{method=poop,table = <<"myblobs">>, digest = <<"123456">>},
-            {<<"localhost">>, 1234})
+            ServerConf)
         )
       ]
     end

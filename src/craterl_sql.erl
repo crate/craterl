@@ -41,19 +41,24 @@
 
 %%% API %%%
 
--spec sql_request(sql_request(), craterl_server_spec()) -> {ok, sql_response()} | {error, term()};
-    (sql_bulk_request(), craterl_server_spec()) -> {ok, sql_bulk_response()} | {error, term()}.
-sql_request(#sql_request{stmt=Stmt, args=Args, includeTypes=IncludeTypes}, ServerSpec) ->
-  sql_request(Stmt, Args, IncludeTypes, ServerSpec);
-sql_request(#sql_bulk_request{stmt=Stmt, bulk_args=BulkArgs, includeTypes = IncludeTypes}, ServerSpec) ->
-  sql_request(Stmt, {bulk, BulkArgs}, IncludeTypes, ServerSpec).
-sql_request(Stmt, Args, IncludeTypes, ServerSpec) ->
-  Response = case hackney:request(post,
-    craterl_url:create_server_url(ServerSpec, IncludeTypes),
-    [{<<"Content-Type">>, <<"application/json">>}],
-    create_payload(Stmt, Args),
-    [{pool, crate}]
-  ) of
+-spec sql_request(sql_request(), craterl_server_conf()) -> {ok, sql_response()} | {error, term()};
+    (sql_bulk_request(), craterl_server_conf()) -> {ok, sql_bulk_response()} | {error, term()}.
+sql_request(#sql_request{stmt=Stmt, args=Args, includeTypes=IncludeTypes}, ServerConf) ->
+  sql_request(Stmt, Args, IncludeTypes, ServerConf);
+sql_request(#sql_bulk_request{stmt=Stmt, bulk_args=BulkArgs, includeTypes = IncludeTypes}, ServerConf) ->
+  sql_request(Stmt, {bulk, BulkArgs}, IncludeTypes, ServerConf).
+sql_request(Stmt, Args, IncludeTypes, #craterl_server_conf{config = {_Options, RequestConfig}, address = ServerUrl}) ->
+  Url = craterl_url:create_server_url(ServerUrl, IncludeTypes),
+  Payload = create_payload(Stmt, Args),
+  lager:debug("sql request: ~p ~p", [Url, Payload]),
+  HttpResponseMeta = hackney:request(post,
+    Url,
+    [{<<"Content-Type">>, <<"application/json">>}, {<<"Accept">>, <<"application/json">>}],
+    Payload,
+    RequestConfig
+  ),
+  lager:debug("sql response: ~p", [HttpResponseMeta]),
+  Response = case HttpResponseMeta of
     {ok, StatusCode, _RespHeaders, ClientRef} ->
        % parse body
        case hackney:body(ClientRef) of
@@ -68,7 +73,8 @@ sql_request(Stmt, Args, IncludeTypes, ServerSpec) ->
              _ErrorCode ->
                {error, build_error_response(Body)}
            end;
-         {error, Reason} -> {error, Reason}
+         {error, Reason} ->
+           {error, Reason}
        end;
     {error, Reason} -> {error, Reason}
   end,

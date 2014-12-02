@@ -41,19 +41,14 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--define(DEFAULT_POOLNAME, crate).
--define(DEFAULT_POOLSIZE, 20).
--define(DEFAULT_TIMEOUT, 60000).
-
 -record(connections, {
-  activelist   :: [ craterl_server_spec() ],
+  activelist   :: {[ craterl_server_spec() ], [ craterl_server_spec() ]},
   inactivelist :: [ craterl_server_spec() ]
 }).
+
 -record(state, {
   connections = #connections{},
-  poolname :: atom(),
-  poolsize :: non_neg_integer(),
-  timeout :: non_neg_integer()
+  config :: {proplists:proplist(), proplists:proplist()}
 }).
 
 %%%===================================================================
@@ -64,14 +59,14 @@
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link(Args) -> {ok, Pid} | ignore | {error, Error}
+%% @spec start_link(ClientSpec, Servers, Options) -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
 
 start_link(ClientSpec, Servers, Options) ->
   gen_server:start_link(ClientSpec, ?MODULE, [{servers, Servers}, {options, Options}], []).
 
--spec get_server(atom()) -> {ok, craterl_server_spec()} | none_active.
+-spec get_server(atom()) -> {ok, craterl_server_conf()} | none_active.
 get_server(ClientName) ->
     gen_server:call(ClientName, get_server).
 
@@ -104,80 +99,55 @@ stop(ClientName) ->
 %%--------------------------------------------------------------------
 init(Args) ->
     Servers  = proplists:get_value(servers, Args, [?CRATERL_DEFAULT_SERVER]),
-    Options  = proplists:get_value(options, Args, []),
-    PoolName = proplists:get_value(poolname, Options, ?DEFAULT_POOLNAME),
-    PoolSize = proplists:get_value(poolsize, Options, ?DEFAULT_POOLSIZE),
-    Timeout  = proplists:get_value(timeout, Options, ?DEFAULT_TIMEOUT),
+    {Options, RequestOptions}  = craterl_config:apply_defaults(proplists:get_value(options, Args, [])),
+    PoolName = craterl_config:get(poolname, Options),
+    PoolSize = craterl_config:get(poolsize, Options),
+    Timeout  = craterl_config:get(timeout, Options),
     ok = hackney_pool:start_pool(PoolName, [{timeout, Timeout}, {max_connections, PoolSize}]),
     {ok,  #state{
-      connections = #connections{
-                      activelist=Servers,
-                      inactivelist=[]
-      },
-      poolname = PoolName,
-      poolsize = PoolSize,
-      timeout = Timeout
-    }}.
+            connections = new_servers(Servers),
+            config = {Options, RequestOptions}
+          }
+    }.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @spec handle_call(Request, From, State) ->
-%%                                   {reply, Reply, State} |
-%%                                   {reply, Reply, State, Timeout} |
-%%                                   {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
-new_state(#state{poolname = PoolName, poolsize = PoolSize, timeout = Timeout}, Connections=#connections{}) ->
+new_state(#state{config=Config}, Connections=#connections{}) ->
   #state{
     connections = Connections,
-    poolname = PoolName,
-    poolsize = PoolSize,
-    timeout = Timeout
+    config = Config
   }.
 
 handle_call(get_server, _From,
-            State = #state{connections = #connections{
-              activelist = Active,
-              inactivelist = Inactive
-            }}) ->
-    lager:info("getserver "),
-    case lookup(Active, Inactive) of
+            State = #state{connections = Connections,
+              config = Config}) ->
+    case lookup_server(Connections) of
         none_active -> {reply, none_active, State};
-        Server -> {reply, {ok, Server}, State}
+      {ok, Server, NewConnections} ->
+        {reply,
+          {ok, #craterl_server_conf{address = Server, config = Config}},
+          new_state(State, NewConnections)
+        }
     end;
 
 handle_call({set_servers, ServerList}, _From, State=#state{}) ->
-    lager:info("set_servers "),
-    {reply, ok, new_state(State, #connections{activelist=ServerList, inactivelist=[]})};
+    NewConnections = new_servers(ServerList),
+    {reply, ok, new_state(State, NewConnections)};
 
 handle_call({add_active, Server}, _From,
-            State = #state{connections = #connections{activelist=Active,
-                         inactivelist=Inactive}}) ->
-    lager:info("getserver active "),
+            State = #state{connections = Connections}) ->
+    NewConnections = add_server(Connections, Server),
     {
       reply,
       ok,
       new_state(
         State,
-        #connections{
-          activelist=[Server|Active],
-          inactivelist=Inactive
-        })
+        NewConnections
+      )
     };
 
 handle_call({add_inactive, Server}, _From, 
-            State=#state{connections = #connections{activelist=Active,
-                         inactivelist=Inactive}}) ->
-    lager:info("getserver inactive "),
-    NewActive = lists:delete(Server, Active),
-    {reply, ok, new_state(State, #connections{activelist=NewActive,
-                             inactivelist=[Server|Inactive]})};
+            State=#state{connections = Connections}) ->
+    NewConnections = remove_server(Connections, Server),
+    {reply, ok, new_state(State, NewConnections)};
 
 handle_call(Request, _From, State) ->
     lager:error("unexpected request ~p, state ~p", [Request, State]),
@@ -240,8 +210,43 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-lookup([], _) -> none_active;
-lookup([H|[]], _Inactive) ->
-  H;
-lookup(Active, _Inactive) ->
-  lists:nth(random:uniform(length(Active)), Active).
+
+-spec new_servers(list()) -> #connections{}.
+new_servers(Servers) ->
+  #connections{activelist = {Servers, []}, inactivelist = []}.
+
+
+-spec add_server(#connections{}, craterl_server_spec()) -> #connections{}.
+add_server(#connections{activelist = {Servers, IteratedServers}} = Connections, Server) ->
+  Connections#connections{activelist = {[Server|Servers], IteratedServers}}.
+
+
+-spec remove_server(#connections{}, craterl_server_spec()) -> #connections{}.
+remove_server(#connections{activelist = {Active, Iterated}} = Connections, Server) ->
+  Connections#connections{activelist = {lists:delete(Server, Active), lists:delete(Server, Iterated)}}.
+
+
+-spec lookup_server(#connections{}) -> none_active | {ok, craterl_server_spec(), #connections{}}.
+lookup_server(#connections{activelist = {[], []}, inactivelist = []}) ->
+  none_active;
+lookup_server(#connections{activelist = {[], []}, inactivelist = [Server|Inactive]} = Connections) ->
+  {ok,
+    Server,
+    Connections#connections{activelist = {Inactive, [Server]}, inactivelist = []}
+  };
+lookup_server(#connections{activelist = {[], [Server|Tail]}} = Connections) ->
+  {
+    ok,
+    Server,
+    Connections#connections{activelist = {Tail, [Server]}}
+  };
+lookup_server(#connections{activelist = {[Server|[]], []}} = Connections) ->
+  {ok,
+    Server,
+    Connections#connections{activelist = {[Server], []}}
+  };
+lookup_server(#connections{activelist = {[Server|Active], Iterated}} = Connections) ->
+  {ok,
+    Server,
+    Connections#connections{activelist = {Active, [Server|Iterated]}}
+  }.

@@ -39,9 +39,9 @@ all() ->
   [simple_query_test_str, simple_query_test_binary].
 
 init_per_suite(Config) ->
-  ok = hackney:start(),
   ok = craterl:start(),
-  ClientRef = craterl:new(),
+  lager:set_loglevel(lager_console_backend, debug),
+  ClientRef = craterl:new([{<<"localhost">>, 48200}, {<<"localhost">>, 48201}]),
   [{client, ClientRef} | Config].
 
 end_per_suite(Config) ->
@@ -52,13 +52,16 @@ end_per_suite(Config) ->
 
 init_per_testcase(_, Config) ->
   Config.
-
 end_per_testcase(_, Config) ->
   Config.
 
 simple_query_test_binary(_Config) ->
-  {ok, Response} = craterl:sql(<<"select id, name from sys.cluster">>),
-  [<<"id">>, <<"name">>] = Response#sql_response.cols.
+  {ok, Response} = craterl:sql(<<"select 'abc', 42, id, name from sys.cluster">>),
+  [<<"'abc'">>, <<"42">>, <<"id">>, <<"name">>] = Response#sql_response.cols,
+  1 = Response#sql_response.rowCount,
+  [[<<"abc">>|Tail]] = Response#sql_response.rows,
+  [42|_] = Tail.
 
 simple_query_test_str(_Config) ->
   {ok, #sql_response{cols=[<<"id">>,<<"name">>,<<"master_node">>, <<"settings">>]}} = craterl:sql("select * from sys.cluster").
+

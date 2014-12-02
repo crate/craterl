@@ -25,6 +25,7 @@
 -module(craterl_gen_server_tests).
 -author("mat").
 
+-include("craterl.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -define(setup(F, Start), {setup, Start, fun stop/1, F}).
@@ -81,17 +82,18 @@ stop(_) ->
   craterl_gen_server:stop(?MODULE),
   timer:sleep(100).
 
-single_server_test(_Servers) ->
+single_server_test(Servers) ->
+  ServerConf = #craterl_server_conf{address = lists:nth(1, Servers), config = craterl_config:apply_defaults()},
   [
-    ?_assertEqual({ok, {<<"localhost">>, 4200}}, craterl_gen_server:get_server(?MODULE)),
-    ?_assertEqual({ok, {<<"localhost">>, 4200}}, craterl_gen_server:get_server(?MODULE)),
-    ?_assertEqual({ok, {<<"localhost">>, 4200}}, craterl_gen_server:get_server(?MODULE))
+    ?_assertEqual({ok, ServerConf}, craterl_gen_server:get_server(?MODULE)),
+    ?_assertEqual({ok, ServerConf}, craterl_gen_server:get_server(?MODULE)),
+    ?_assertEqual({ok, ServerConf}, craterl_gen_server:get_server(?MODULE))
   ].
 
 multiple_server_test(Servers) ->
   ServersGot = lists:map(fun(_) ->
-      {ok, Server} = craterl_gen_server:get_server(?MODULE),
-      Server
+      {ok, ServerConf} = craterl_gen_server:get_server(?MODULE),
+      ServerConf#craterl_server_conf.address
     end,
     lists:seq(1, 4)
   ),
@@ -100,8 +102,8 @@ multiple_server_test(Servers) ->
   ].
 
 inactive_server_test(Servers) ->
-  {ok, Server} = craterl_gen_server:get_server(?MODULE),
-
+  {ok, ServerConf} = craterl_gen_server:get_server(?MODULE),
+  Server = ServerConf#craterl_server_conf.address,
   [
     ?_assertEqual(true, lists:member(Server, Servers)),
     ?_assertEqual(ok, craterl_gen_server:add_inactive(?MODULE, lists:nth(1, Servers))),
@@ -110,8 +112,13 @@ inactive_server_test(Servers) ->
     ?_assertNotEqual({ok, lists:nth(1, Servers)}, craterl_gen_server:get_server(?MODULE)),
     ?_assertNotEqual({ok, lists:nth(1, Servers)}, craterl_gen_server:get_server(?MODULE)),
     ?_assertEqual(ok, craterl_gen_server:add_inactive(?MODULE, lists:nth(2, Servers))),
-    ?_assertEqual({ok, lists:nth(3, Servers)}, craterl_gen_server:get_server(?MODULE)),
-    ?_assertEqual({ok, lists:nth(3, Servers)}, craterl_gen_server:get_server(?MODULE)),
+    ?_assertEqual(
+      {ok, #craterl_server_conf{address = lists:nth(3, Servers), config = craterl_config:apply_defaults()}},
+      craterl_gen_server:get_server(?MODULE)
+    ),
+    ?_assertEqual(
+      {ok, #craterl_server_conf{address = lists:nth(3, Servers), config = craterl_config:apply_defaults()}},
+      craterl_gen_server:get_server(?MODULE)),
     ?_assertEqual(ok, craterl_gen_server:add_inactive(?MODULE, lists:nth(3, Servers))),
     ?_assertEqual(none_active, craterl_gen_server:get_server(?MODULE))
   ].
@@ -119,8 +126,13 @@ inactive_server_test(Servers) ->
 
 set_server_test(_) ->
     ok = craterl_gen_server:set_servers(?MODULE, [{<<"127.0.0.1">>, 123}]),
+    ServerConf = #craterl_server_conf{
+      address = {<<"127.0.0.1">>, 123},
+      config = craterl_config:apply_defaults()
+    },
     [
-     ?_assertEqual({ok, {<<"127.0.0.1">>, 123}}, craterl_gen_server:get_server(?MODULE))
+     ?_assertEqual({ok, ServerConf},
+       craterl_gen_server:get_server(?MODULE))
     ].
 
 active_test(Servers) ->
@@ -129,7 +141,7 @@ active_test(Servers) ->
   AllServers = Servers ++ [NewServer],
   GetServer = fun() ->
     {ok, Server} = craterl_gen_server:get_server(?MODULE),
-    Server
+    Server#craterl_server_conf.address
   end,
   [
     ?_assertEqual(true, lists:member(GetServer(), AllServers)),

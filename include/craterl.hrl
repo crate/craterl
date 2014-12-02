@@ -31,6 +31,7 @@
 -define(CRATERL_DEFAULT_ERROR_CODE, 1000).
 -define(CRATERL_DEFAULT_SERVER, {<<"localhost">>, 4200}).
 
+
 -define(CRATE_TYPE_UNDEFINED, 0).
 -define(CRATE_TYPE_NOT_SUPPORTED, 1).
 -define(CRATE_TYPE_BYTE, 2).
@@ -48,9 +49,16 @@
 -define(CRATE_TYPE_ARRAY, 100).
 -define(CRATE_TYPE_SET, 101).
 
+
 -type craterl_client_spec() :: {local, atom()} | {global, atom()} | {via, atom(), atom()}.
 
 -type craterl_server_spec() :: {binary(), non_neg_integer()}.
+
+-record(craterl_server_conf, {
+  address :: craterl_server_spec(),
+  config :: {proplists:proplist(), proplists:proplist()}
+}).
+-type craterl_server_conf() :: #craterl_server_conf{}.
 
 -record(sql_request, {
         stmt :: binary(),
@@ -107,6 +115,7 @@
 -export_type([
   craterl_client_spec/0,
   craterl_server_spec/0,
+  craterl_server_conf/0,
   sql_request/0, sql_response/0, sql_error/0,
   sql_bulk_response/0, sql_bulk_request/0, sql_bulk_result/0,
   blob_request/0

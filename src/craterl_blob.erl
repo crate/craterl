@@ -40,17 +40,17 @@
 
 %%% API %%%
 
--spec blob_request(blob_request(), craterl_server_spec()) -> {ok, term()} | {error, term()}.
-blob_request(#blob_request{method=Method, table=Table, digest=Digest, payload=Payload}, ServerSpec) ->
+-spec blob_request(blob_request(), craterl_server_conf()) -> {ok, term()} | {error, term()}.
+blob_request(#blob_request{method=Method, table=Table, digest=Digest, payload=Payload}, ServerConf) ->
   Response = case Method of
     get ->
       case Payload of
-        undefined -> blob_get_to_mem(ServerSpec, Table, Digest);
-        {file, FilePath} -> blob_get_to_file(ServerSpec, Table, Digest, FilePath)
+        undefined -> blob_get_to_mem(ServerConf, Table, Digest);
+        {file, FilePath} -> blob_get_to_file(ServerConf, Table, Digest, FilePath)
       end;
-    head -> blob_exists(ServerSpec, Table, Digest);
-    put -> blob_put(ServerSpec, Table, Digest, Payload);
-    delete -> blob_delete(ServerSpec, Table, Digest);
+    head -> blob_exists(ServerConf, Table, Digest);
+    put -> blob_put(ServerConf, Table, Digest, Payload);
+    delete -> blob_delete(ServerConf, Table, Digest);
     _ -> {error, unsupported}
   end,
   Response.
@@ -58,9 +58,10 @@ blob_request(#blob_request{method=Method, table=Table, digest=Digest, payload=Pa
 
 %%% INTERNAL %%%
 
--spec blob_put(craterl_server_spec(), binary(), binary(), blob_payload()) -> {ok, {created, binary()}} | {error, term()}.
-blob_put(ServerSpec, Table, Digest, Payload) when is_binary(Table) and is_binary(Digest) ->
-  Url =  craterl_url:create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>),
+-spec blob_put(ServerConf :: craterl_server_conf(), Table :: binary(), Digest :: binary(), Payload :: blob_payload()) -> {ok, {created, binary()}} | {error, term()}.
+blob_put(#craterl_server_conf{config = {_Options, RequestConfig}, address = ServerUrl}, Table, Digest, Payload) when is_binary(Table) and is_binary(Digest) ->
+
+  Url =  craterl_url:create_server_url(ServerUrl, <<"/_blobs/", Table/binary, "/", Digest/binary>>),
   lager:debug("putting blob to ~p", [Url]),
   case hackney:request(put,
     Url,
@@ -68,7 +69,7 @@ blob_put(ServerSpec, Table, Digest, Payload) when is_binary(Table) and is_binary
       {<<"Transfer-Encoding">>, <<"chunked">>}
     ],
     stream,
-    [{pool, crate}]
+    RequestConfig
   ) of
     {ok, Client} ->
       Body = case Payload of
@@ -94,8 +95,8 @@ blob_put(ServerSpec, Table, Digest, Payload) when is_binary(Table) and is_binary
       {error, Reason} -> {error, Reason}
   end.
 
--spec blob_get_to_mem(craterl_server_spec(), binary(), binary()) -> {ok, fun(()-> {ok, binary() | done})}.
-blob_get_to_mem(ServerSpec, Table, Digest) ->
+-spec blob_get_to_mem(ServerConf :: craterl_server_conf(), Table :: binary(), Digest :: binary()) -> {ok, fun(()-> {ok, binary() | done})}.
+blob_get_to_mem(ServerConf, Table, Digest) ->
   HandleBodyFun = fun (ClientRef) ->
     GetDataFun = fun() ->
       case hackney:stream_body(ClientRef) of
@@ -105,10 +106,10 @@ blob_get_to_mem(ServerSpec, Table, Digest) ->
     end,
     {ok, GetDataFun}
   end,
-  execute_blob_request(ServerSpec, get, Table, Digest, HandleBodyFun).
+  execute_blob_request(ServerConf, get, Table, Digest, HandleBodyFun).
 
--spec blob_get_to_file(craterl_server_spec(), binary(), binary(), binary()) -> {ok, binary()} | {error, term()}.
-blob_get_to_file(ServerSpec, Table, Digest, FilePath) ->
+-spec blob_get_to_file(ServerConf :: craterl_server_conf(), Table :: binary(), Digest :: binary(), FilePath :: binary()) -> {ok, binary()} | {error, term()}.
+blob_get_to_file(ServerConf, Table, Digest, FilePath) ->
   HandleBodyFun = fun (ClientRef) ->
       case file:open(FilePath, [write, binary, raw]) of
         {ok, FileHandle} ->
@@ -121,21 +122,21 @@ blob_get_to_file(ServerSpec, Table, Digest, FilePath) ->
         {error, Reason} -> {error, Reason}
       end
   end,
-  execute_blob_request(ServerSpec, get, Table, Digest, HandleBodyFun).
+  execute_blob_request(ServerConf, get, Table, Digest, HandleBodyFun).
 
--spec blob_exists(craterl_server_spec(), binary(), binary()) -> {ok, exists} | {error, term()}.
-blob_exists(ServerSpec, Table, Digest) ->
+-spec blob_exists(ServerConf :: craterl_server_conf(), Table :: binary(), Digest :: binary()) -> {ok, exists} | {error, 404} | {error, term()}.
+blob_exists(ServerConf, Table, Digest) ->
   SuccessFun = fun (_ClientRef) ->
     {ok, exists}
   end,
-  execute_blob_request(ServerSpec, head, Table, Digest, SuccessFun).
+  execute_blob_request(ServerConf, head, Table, Digest, SuccessFun).
 
--spec blob_delete(craterl_server_spec(), binary(), binary()) -> {ok, deleted} | {error, term()}.
-blob_delete(ServerSpec, Table, Digest) ->
+-spec blob_delete(ServerConf :: craterl_server_conf(), Table :: binary(), Digest :: binary()) -> {ok, deleted} | {error, term()}.
+blob_delete(ServerConf, Table, Digest) ->
   SuccessFun = fun (_ClientRef) ->
     {ok, deleted}
   end,
-  execute_blob_request(ServerSpec, delete, Table, Digest, SuccessFun).
+  execute_blob_request(ServerConf, delete, Table, Digest, SuccessFun).
 
 
 -spec stream_blob_to_file(hackney:client_ref(), FileHandle::term()) -> ok | {ok, binary()} | {error, term()}.
@@ -148,17 +149,25 @@ stream_blob_to_file(ClientRef, FileHandle) ->
     {error, Reason} -> {error, Reason}
   end.
 
--spec execute_blob_request(craterl_server_spec(), atom(), binary(), binary(), fun((hackney:client_ref()) -> term()))  -> term().
-execute_blob_request(ServerSpec, Method, Table, Digest, HandleBodyFun) when is_function(HandleBodyFun)
+-spec execute_blob_request(craterl_server_conf(), atom(), binary(), binary(), fun((hackney:client_ref()) -> term()))  -> term().
+execute_blob_request(#craterl_server_conf{config = {_Options, RequestConfig}, address = ServerUrl}, Method, Table, Digest, HandleBodyFun) when is_function(HandleBodyFun)
                                                                 and is_atom(Method) ->
-  Url = craterl_url:create_server_url(ServerSpec, <<"/_blobs/", Table/binary, "/", Digest/binary>>),
-  lager:debug("blob request to ~p", [Url]),
+  Url = craterl_url:create_server_url(ServerUrl,
+    <<"/_blobs/", Table/binary, "/", Digest/binary>>),
+  lager:debug("blob request: ~p ~p", [Method, Url]),
   Headers = [],
-  Options = [{pool, crate}],
-  case hackney:request(Method, Url, Headers, <<>>, Options) of
+  ResponseMeta = hackney:request(Method, Url, Headers, <<>>, RequestConfig),
+  lager:debug("blob response: ~p", [ResponseMeta]),
+  case ResponseMeta of
     {ok, StatusCode, _RespHeaders, ClientRef} ->
       case StatusCode of
           Code when Code < 400 -> HandleBodyFun(ClientRef);
+          _ -> {error, StatusCode}
+      end;
+    {ok, StatusCode, _RespHeaders} ->
+      % HEAD Request
+      case StatusCode of
+          Code when Code < 400 -> HandleBodyFun(undefined);
           _ -> {error, StatusCode}
       end;
     {error, Reason} -> {error, Reason}

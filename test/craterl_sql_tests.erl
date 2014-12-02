@@ -59,6 +59,11 @@ teardown_mecks(_) ->
   meck:validate(hackney),
   meck:unload(hackney).
 
+test_server_conf() ->
+  #craterl_server_conf{
+    address={<<"localhost">>, 4300},
+    config = craterl_config:apply_defaults()
+  }.
 
 sql_request_test_() ->
 {
@@ -68,38 +73,39 @@ sql_request_test_() ->
     fun setup_sql/0,
     fun teardown_mecks/1,
     fun (_) ->
+      ServerConf = test_server_conf(),
       [
         ?_assertEqual(
           {ok, #sql_response{cols = [], rows = [], rowCount = 0, duration = 0}},
-          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
+          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, ServerConf)
         ),
         ?_assertEqual(
           {ok, #sql_bulk_response{cols = [], colTypes = [1,2], results = [], duration = 4}},
-          craterl_sql:sql_request(#sql_bulk_request{stmt = <<"select * from t">>, bulk_args=[]}, {<<"localhost">>, 4300})
+          craterl_sql:sql_request(#sql_bulk_request{stmt = <<"select * from t">>, bulk_args=[]}, ServerConf)
         ),
         ?_assertEqual(
           {ok, #sql_response{cols = [<<"a">>, <<"b">>], rows = [[true, 5.6], [false, -5.6]], rowCount=2, duration=12456}},
-          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
+          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, ServerConf)
         ),
         ?_assertEqual(
           {error, invalid_json},
-          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
+          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, ServerConf)
         ),
         ?_assertEqual(
           {error, #sql_error{code = 4000, message = <<"something went wrong">>}},
-          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
+          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, ServerConf)
         ),
         ?_assertEqual(
           {error, no_content},
-          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
+          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, ServerConf)
         ),
         ?_assertEqual(
           {error, timeout},
-          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
+          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, ServerConf)
         ),
         ?_assertEqual(
           {error, closed},
-          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, {<<"localhost">>, 4300})
+          craterl_sql:sql_request(#sql_request{stmt = <<"select * from t">>, args=[]}, ServerConf)
         )
 
       ]

@@ -2,13 +2,20 @@
 CHANGES for craterl
 ===================
 
-Unreleased
-==========
+2014/12/02 0.1.0
+================
+
+ - execute requests in the calling process, no supervising.
+   This is the job of the application using craterl
+
+ - support for sql bulk operations
+
+ - creating many clients per erlang node is possible
+   using a variant of ``craterl:new()``
+
+ - support for putting, deleting blobs and to check for existence
 
  - support for downloading blobs, base64 encoded to stdout or to a file.
-   api is
 
-.. code-block:: erlang
-
-    craterl:blob_get(BlobTable, HexDigest).
-    craterl:blob_get_to_file(BlobTable, HexDigest, FilePath).
+ - support for executing arbitrary sql requests with or without parameters
+   (pure erlang terms)

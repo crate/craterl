@@ -5,6 +5,9 @@
 /log/
 /ct/logs/
 /.concrete/
+/_build/
+mix.lock
+rebar.config.lock
 *.o
 *.beam
 *.plt

@@ -124,7 +124,8 @@ new(Servers, Options) when is_list(Options) ->
 %%--------------------------------------------------------------------
 -spec new(ClientSpec:: craterl_client_spec(), Servers::[craterl_server_spec()], Options::[term()]) -> atom().
 new(ClientSpec, Servers, Options) ->
-  craterl_sup:start_client(ClientSpec, Servers, Options).
+  NormalizedServers = lists:map(fun(Spec) -> craterl_url:server_spec(Spec) end, Servers),
+  craterl_sup:start_client(ClientSpec, NormalizedServers, Options).
 
 %%--------------------------------------------------------------------
 %% @doc

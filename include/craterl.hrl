@@ -52,7 +52,7 @@
 
 -type craterl_client_spec() :: {local, atom()} | {global, atom()} | {via, atom(), atom()}.
 
--type craterl_server_spec() :: {binary(), non_neg_integer()}.
+-type craterl_server_spec() :: {binary(), non_neg_integer()} | string() | binary().
 
 -record(craterl_server_conf, {
   address :: craterl_server_spec(),

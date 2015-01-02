@@ -193,6 +193,8 @@ new_test_() -> {
         ?_assertEqual(ok, craterl:stop_client(craterl)),
         ?_assertEqual([], supervisor:which_children(craterl_sup)),
         ?_assertEqual(craterl, craterl:new([?CRATERL_DEFAULT_SERVER])),
+        ?_assertEqual(string, craterl:new({local, string}, ["localhost:4200"], [])),
+        ?_assertEqual(binary, craterl:new({local, binary}, [<<"localhost:4200">>], [])),
         ?_assertEqual({error, {already_started, craterl}}, craterl:new([?CRATERL_DEFAULT_SERVER], [{poolsize, 100}])),
         ?_assertEqual(ok, craterl:stop_client(craterl)),
         ?_assertEqual(craty, craterl:new({local, craty}, [?CRATERL_DEFAULT_SERVER], [])),

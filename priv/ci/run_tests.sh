@@ -1,5 +1,5 @@
 #!/bin/bash
-CRATE_DEFAULT_VERSION="0.45.5"
+CRATE_DEFAULT_VERSION="0.45.6"
 
 if [ "${CRATE_VERSION}x" = "x" ]
 then

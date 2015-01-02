@@ -36,7 +36,7 @@ instance using a variant of the ```craterl:new()``` function:
 
 ```erlang
 ClientSpec = {local, my_client}.
-Servers = [{<<"localhost">>, 4200}, {<<"localhost">>, 4201}].
+Servers = [{<<"localhost">>, 4200}, "localhost:4201"].
 Options = [{poolsize, 1000}, {timeout, 5000}].
 ClientRef = craterl:new(ClientSpec, Servers, Options).
 ```
@@ -45,6 +45,23 @@ It is possible to create many clients on one erlang node.
 ```craterl``` client instances are created using a client spec which is
 a tuple you would use when registering a process, like ```{local, your_name}```.
 The process name, ```your_name``` in this example, must be unique on a node.
+
+### Options ###
+
+The following options can be used to change the behaviour of a newly created craterl client:
+
+    * poolname - ```string()``` or ```binary()```, the name of the connection pool, handled by hackney (erlang http client)
+    * poolsize - ```integer()```, the size of the connection pool, also handled by hackney
+    * timeout - ```integer()```, the receive and connect timeout for connections to crate servers, in milliseconds
+    * ssl_options - ```term()```, the same options the erlang ssl module accepts as ```ssloptions()```
+    * ssl_insecure - ```boolean()```, whether ssl certificates should be validated or not
+
+Example:
+
+```erlang
+Options = [{poolname, "my_pool"}, {poolsize, 200}, {timeout, 6000}, {ssl_insecure, false}, {ssl_options, [{cipers, [{rsa, aes_256_cbc, sha}]}, {cacerts, MyDerEncodedCaCerts}]}].
+ClientRef = craterl:new(craterl, [{<<"localhost", 4200}], Options).
+```
 
 See the documentation of the ```craterl``` module for more detailed api documentation.
 

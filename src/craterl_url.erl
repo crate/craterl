@@ -31,7 +31,8 @@
 
 %% API
 -export([
-  create_server_url/2
+  create_server_url/2,
+  server_spec/1
 ]).
 
 -ifdef(TEST).
@@ -59,3 +60,13 @@ create_server_url({Host, Port}, Path) when is_binary(Path) ->
     <<"https://", _/binary>> -> Url;
     <<_/binary>> -> <<"http://", Url/binary>>
   end.
+
+
+-spec server_spec({binary(), integer()}|string()|binary()) -> {binary(), integer()}.
+server_spec({Host, Port}=HostPort) when is_binary(Host), is_integer(Port) ->
+  HostPort;
+server_spec(HostPort) when is_list(HostPort) ->
+  server_spec(list_to_binary(HostPort));
+server_spec(HostPort) when is_binary(HostPort) ->
+  [Host, Port] = binary:split(HostPort, <<":">>),
+  {Host, binary_to_integer(Port)}.

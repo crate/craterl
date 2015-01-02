@@ -50,11 +50,11 @@ The process name, ```your_name``` in this example, must be unique on a node.
 
 The following options can be used to change the behaviour of a newly created craterl client:
 
-    * poolname - ```string()``` or ```binary()```, the name of the connection pool, handled by hackney (erlang http client)
-    * poolsize - ```integer()```, the size of the connection pool, also handled by hackney
-    * timeout - ```integer()```, the receive and connect timeout for connections to crate servers, in milliseconds
-    * ssl_options - ```term()```, the same options the erlang ssl module accepts as ```ssloptions()```
-    * ssl_insecure - ```boolean()```, whether ssl certificates should be validated or not
+* poolname - ```string()``` or ```binary()```, the name of the connection pool, handled by hackney (erlang http client)
+* poolsize - ```integer()```, the size of the connection pool, also handled by hackney
+* timeout - ```integer()```, the receive and connect timeout for connections to crate servers, in milliseconds
+* ssl_options - ```term()```, the same options the erlang ssl module accepts as ```ssloptions()```
+* ssl_insecure - ```boolean()```, whether ssl certificates should be validated or not
 
 Example:
 

@@ -2,6 +2,13 @@
 CHANGES for craterl
 ===================
 
+2015/01/02 0.2.0
+================
+
+ - Allow server specs as binary and string
+
+ - updated dependencies
+
 2014/12/02 0.1.1
 ================
 

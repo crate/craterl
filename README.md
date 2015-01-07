@@ -11,7 +11,7 @@ not yet verified to be rock-solid in a production environment.
 
 ## Compatibility ##
 
-Tested with Erlang ``R16B03-1`` and ``17``.
+Tested with OTP releases ``R16B`` and ``17``.
 
 ## Installation ##
 
@@ -59,7 +59,15 @@ The following options can be used to change the behaviour of a newly created cra
 Example:
 
 ```erlang
-Options = [{poolname, "my_pool"}, {poolsize, 200}, {timeout, 6000}, {ssl_insecure, false}, {ssl_options, [{cipers, [{rsa, aes_256_cbc, sha}]}, {cacerts, MyDerEncodedCaCerts}]}].
+Options = [
+    {poolname, "my_pool"}, 
+    {poolsize, 200}, {timeout, 6000}, 
+    {ssl_insecure, false}, 
+    {ssl_options, [
+        {cipers, [{rsa, aes_256_cbc, sha}]}, 
+        {cacerts, MyDerEncodedCaCerts}
+    ]}
+].
 ClientRef = craterl:new(craterl, [{<<"localhost", 4200}], Options).
 ```
 
@@ -67,51 +75,45 @@ See the documentation of the ```craterl``` module for more detailed api document
 
 ### SQL ###
 
-Issuing SQL statements using craterl is possible with one of the variants of ```craterl:sql()```:
+Issuing SQL statements using craterl is possible with one of the variants 
+of ```craterl:sql()```:
 
 ```erlang
 {ok Response} = craterl:sql("select id, name from sys.cluster").
-{ok, #sql_response{cols = [<<"id">>,<<"name">>],
-                  colTypes = [],
-                  rows = [[<<"89b8f6bf-4082-415b-937e-7de66b67f6fe">>,
-                           <<"crate">>]],
-                  rowCount = 1,duration = 12}}
-{ok, Response2} = craterl:sql(ClientRef, <<"select * from user where id in (?, ?, ?)">>, [1, 2, 3]).
+[[<<"89b8f6bf-4082-415b-937e-7de66b67f6fe">>, <<"crate">>]] = Response#sql_response.rows.
+[<<"id">>,<<"name">>] = Response#sql_response.cols.
+
+Stmt = <<"select * from user where id in (?, ?, ?)">>.
+Args = [1, 2, 3].
+{ok, Response2} = craterl:sql(ClientRef, Stmt, Args).
+
 Request = #sql_request{stmt = <<"select count(*) from sys.nodes">>}.
-#sql_request{stmt = <<"select count(*) from sys.nodes">>,
-             args = [],includeTypes = false}
-{ok, Response3} = craterl:sql().
-{ok,#sql_response{cols = [<<"count(*)">>],
-                  colTypes = [],
-                  rows = [[1]],
-                  rowCount = 1,duration = 240}}
+{ok, Response3} = craterl:sql(Request).
+[[3]] = Response3#sql_response.rows.
 ```
 
-For issuing multiple INSERT / DELETE or UPDATE requests, the ```craterl:sql_bulk()```
-functions can be used:
+For issuing multiple INSERT / DELETE or UPDATE requests with one roundtrip, 
+the ```craterl:sql_bulk()``` functions can be used:
 
 ```erlang
-{ok, BulkResponse} = craterl:sql_bulk(ClientRef, <<"insert into t (id, name) values (?, ?)">>, [[1, <<"Ford">>], [2, <<"Trillian">>], [3, <<"Zaphod">>]]).
-{ok,#sql_bulk_response{cols = [],colTypes = [],
-                       results = [[{<<"rowcount">>,1}],
-                                  [{<<"rowcount">>,1}],
-                                  [{<<"rowcount">>,1}]],
-                       duration = 135}}
-{ok, BulkResponse2} = craterl:sql_bulk(<<"update t set new_column=? where id=?">>, [[<<"funky">>, 1], [<<"shizzle">>, 2], [<<"indeed">>, 3]]).
-02:00:13.409 [info] getserver
-{ok,#sql_bulk_response{cols = [],colTypes = [],
-                       results = [[{<<"rowcount">>,1}],
-                                  [{<<"rowcount">>,1}],
-                                  [{<<"rowcount">>,1}]],
-                       duration = 47}}
-craterl:sql("select * from t").
-{ok,#sql_response{cols = [<<"id">>,<<"name">>,
-                          <<"new_column">>],
-                  colTypes = [],
-                  rows = [[1,<<"Ford">>,<<"funky">>],
-                          [2,<<"Trillian">>,<<"shizzle">>],
-                          [3,<<"Zaphod">>,<<"indeed">>]],
-                  rowCount = 3,duration = 59}}
+Stmt = <<"insert into t (id, name) values (?, ?)">>.
+BulkArgs = [[1, <<"Ford">>], [2, <<"Trillian">>], [3, <<"Zaphod">>]].
+{ok, BulkResponse} = craterl:sql_bulk(ClientRef, Stmt, BulkArgs).
+[[{<<"rowcount">>,1}], 
+ [{<<"rowcount">>,1}], 
+ [{<<"rowcount">>,1}]] = BulkResponse#sql_bulk_response.results.
+
+Stmt2 = <<"update t set new_column=? where id=?">>.
+BulkArgs2 = [[<<"funky">>, 1], [<<"shizzle">>, 2], [<<"indeed">>, 3]].
+{ok, BulkResponse2} = craterl:sql_bulk(Stmt2, BulkArgs2).
+[[{<<"rowcount">>,1}], 
+ [{<<"rowcount">>,1}], 
+ [{<<"rowcount">>,1}]] = BulkResponse2#sql_bulk_response.results.
+
+{ok, SelectResponse} = craterl:sql("select * from t").
+[[1,<<"Ford">>,<<"funky">>],
+ [2,<<"Trillian">>,<<"shizzle">>],
+ [3,<<"Zaphod">>,<<"indeed">>]] = SelectResponse#sql_response.rows.
 ```
 
 Every sql api function has a variant that accepts a ```ClientRef``` as first 
@@ -140,11 +142,11 @@ Content = <<"awesome!">>.
 HashDigest = <<"040f06fd774092478d450774f5ba30c5da78acc8">>.
 
 File = <<"/usr/share/dict/words">>
-{ok,{created, Hash}} = craterl:blob_put_file(ClientRef, <<"myblobs">>, <<"/usr/share/dict/words">>).
+{ok,{created, WordsHash}} = craterl:blob_put_file(ClientRef, <<"myblobs">>, <<"/usr/share/dict/words">>).
 WordsHash = <<"a62edf8685920f7d5a95113020631cdebd18a185">>.
 ```
 
-You can get blobs to memory or to file. Both method will make use of chunked HTTP
+You can get blobs to memory or to file. Both methods will make use of chunked HTTP
 encoding so you will receive the blob piece by piece and won't load big blobs into memory at once.
 
 ```erlang
@@ -179,7 +181,7 @@ ok = craterl:blob_delete(<<"myblobs">>, WordsHash).
 
 Every blob api function, like the sql functions,  has a variant that accepts 
 a ```ClientRef``` as first argument that is an atom referencing a ```craterl``` 
-client that has been started using a variant ```craterl:new()```.
+client that has been started using a variant of ```craterl:new()```.
 
 ## Tests ##
 

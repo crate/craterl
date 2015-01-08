@@ -27,7 +27,6 @@
 -behaviour(gen_server).
 
 -include("craterl.hrl").
--compile([{parse_transform, lager_transform}]).
 
 %% API
 -export([start_link/3, stop/1,
@@ -149,8 +148,7 @@ handle_call({add_inactive, Server}, _From,
     NewConnections = remove_server(Connections, Server),
     {reply, ok, new_state(State, NewConnections)};
 
-handle_call(Request, _From, State) ->
-    lager:error("unexpected request ~p, state ~p", [Request, State]),
+handle_call(_Request, _From, State) ->
     {reply, error, State}.
 
 %%--------------------------------------------------------------------

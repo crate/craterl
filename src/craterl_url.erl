@@ -40,7 +40,6 @@
 -endif.
 
 -include("craterl.hrl").
--compile([{parse_transform, lager_transform}]).
 
 -define(SQLPATH, <<"/_sql">>).
 

@@ -37,7 +37,6 @@
 -endif.
 
 -include("craterl.hrl").
--compile([{parse_transform, lager_transform}]).
 
 %%% API %%%
 
@@ -50,14 +49,12 @@ sql_request(#sql_bulk_request{stmt=Stmt, bulk_args=BulkArgs, includeTypes = Incl
 sql_request(Stmt, Args, IncludeTypes, #craterl_server_conf{config = {_Options, RequestConfig}, address = ServerUrl}) ->
   Url = craterl_url:create_server_url(ServerUrl, IncludeTypes),
   Payload = create_payload(Stmt, Args),
-  lager:debug("sql request: ~p ~p", [Url, Payload]),
   HttpResponseMeta = hackney:request(post,
     Url,
     [{<<"Content-Type">>, <<"application/json">>}, {<<"Accept">>, <<"application/json">>}],
     Payload,
     RequestConfig
   ),
-  lager:debug("sql response: ~p", [HttpResponseMeta]),
   Response = case HttpResponseMeta of
     {ok, StatusCode, _RespHeaders, ClientRef} ->
        % parse body

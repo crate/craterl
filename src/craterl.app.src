@@ -19,8 +19,7 @@
                   stdlib,
                   crypto,
                   jsx,
-                  hackney,
-                  lager
+                  hackney
                  ]},
   {mod,
     {craterl_app, []}

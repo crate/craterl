@@ -36,7 +36,6 @@
 -endif.
 
 -include("craterl.hrl").
--compile([{parse_transform, lager_transform}]).
 
 %%% API %%%
 
@@ -62,7 +61,6 @@ blob_request(#blob_request{method=Method, table=Table, digest=Digest, payload=Pa
 blob_put(#craterl_server_conf{config = {_Options, RequestConfig}, address = ServerUrl}, Table, Digest, Payload) when is_binary(Table) and is_binary(Digest) ->
 
   Url =  craterl_url:create_server_url(ServerUrl, <<"/_blobs/", Table/binary, "/", Digest/binary>>),
-  lager:debug("putting blob to ~p", [Url]),
   case hackney:request(put,
     Url,
     [
@@ -154,10 +152,8 @@ execute_blob_request(#craterl_server_conf{config = {_Options, RequestConfig}, ad
                                                                 and is_atom(Method) ->
   Url = craterl_url:create_server_url(ServerUrl,
     <<"/_blobs/", Table/binary, "/", Digest/binary>>),
-  lager:debug("blob request: ~p ~p", [Method, Url]),
   Headers = [],
   ResponseMeta = hackney:request(Method, Url, Headers, <<>>, RequestConfig),
-  lager:debug("blob response: ~p", [ResponseMeta]),
   case ResponseMeta of
     {ok, StatusCode, _RespHeaders, ClientRef} ->
       case StatusCode of

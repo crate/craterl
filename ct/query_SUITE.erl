@@ -44,7 +44,6 @@ all() ->
 
 init_per_suite(Config) ->
   ok = craterl:start(),
-  lager:set_loglevel(lager_console_backend, debug),
   ClientRef = craterl:new([{<<"localhost">>, 48200}, {<<"localhost">>, 48201}]),
   [{client, ClientRef} | Config].
 

@@ -26,7 +26,6 @@
 -module(craterl).
 
 -include("craterl.hrl").
--compile([{parse_transform, lager_transform}]).
 
 %% API
 -export([
@@ -58,7 +57,6 @@ start() ->
 start_deps(App, Type) ->
   case application:start(App, Type) of
     {error, {not_started, Dep}} ->
-      lager:info("~p not started~n", [Dep]),
       start_deps(Dep, Type),
       start_deps(App, Type);
     {error, {already_started, _Dep}} -> ok;

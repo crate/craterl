@@ -24,7 +24,6 @@
 %%%-------------------------------------------------------------------
 -module(craterl_hash).
 -author("mat").
--compile([{parse_transform, lager_transform}]).
 
 -ifdef(TEST).
 -compile(export_all).
@@ -67,7 +66,6 @@ sha1HexFile(FilePath) ->
       file:close(FileHandle),
       Result;
     {error, Reason} ->
-      lager:info("file not found"),
       {error, Reason}
   end.
 

@@ -7,23 +7,21 @@ defmodule Craterl.Mixfile do
             version: "0.2.0",
             description: description,
             package: package,
-            deps: deps,
+            deps: deps(),
             language: :erlang
         ]
     end
 
     defp deps do
         [
-            {:lager,   "2.0.3", github: "basho/lager",          tag: "2.0.3"},
-            {:jsx,     "2.1.1", github: "talentdeficit/jsx",    tag: "v2.1.1"},
-            {:hackney, "1.0.5", github: "benoitc/hackney",      tag: "1.0.5"},
-            {:meck,    "0.8.2", github: "eproxus/meck",         branch: "master"}
+            {:jsx,     "~> 2.4.0"},
+            {:hackney, "~> 1.0.2"}
         ]
     end
 
     defp description do
         """
-        Erlang/Elixir client for crate using the HTTP REST API of crate to
+        Erlang client for crate using the HTTP REST API of crate to
         issue SQL queries and manage blobs.
         """
     end

@@ -4,7 +4,7 @@ defmodule Craterl.Mixfile do
     def project do
         [
             app: :craterl,
-            version: "0.2.0",
+            version: "0.2.1",
             description: description,
             package: package,
             deps: deps(),

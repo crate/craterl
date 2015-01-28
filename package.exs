@@ -15,7 +15,7 @@ defmodule Craterl.Mixfile do
     defp deps do
         [
             {:jsx,     "~> 2.4.0"},
-            {:hackney, "~> 1.0.5"}
+            {:hackney, "~> 1.0.6"}
         ]
     end
 

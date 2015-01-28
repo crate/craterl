@@ -15,13 +15,13 @@ defmodule Craterl.Mixfile do
     defp deps do
         [
             {:jsx,     "~> 2.4.0"},
-            {:hackney, "~> 1.0.2"}
+            {:hackney, "~> 1.0.5"}
         ]
     end
 
     defp description do
         """
-        Erlang client for crate using the HTTP REST API of crate to
+        Erlang client for crate using its HTTP REST API to
         issue SQL queries and manage blobs.
         """
     end

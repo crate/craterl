@@ -29,7 +29,7 @@
 -module(craterl_api_tests).
 -author("Matthias Wahl").
 
--include("craterl.hrl").
+-include("../src/craterl_priv.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 setup() ->
@@ -153,14 +153,12 @@ start_app_test_() -> {
       application:stop(craterl),
       application:stop(hackney),
       application:stop(goldrush),
-      application:stop(lager),
       ok
     end,
     fun (_) ->
       application:stop(craterl),
       application:stop(hackney),
       application:stop(goldrush),
-      application:stop(lager),
       ok
     end,
     fun (_) ->
@@ -238,17 +236,6 @@ sql_test_() -> {
         ?_assertEqual({ok, #sql_response{
               rowCount = 1,
               rows = [[
-                [],
-                <<"localhost">>,
-                4200,
-                false
-              ]]
-            }
-          },
-          craterl:sql(#sql_request{stmt = <<"select id from sys.cluster">>, args=[]})),
-        ?_assertEqual({ok, #sql_response{
-              rowCount = 1,
-              rows = [[
                 [<<"bla">>],
                 <<"localhost">>,
                 4200,
@@ -314,16 +301,6 @@ sql_bulk_test_() -> {
                 <<"insert into test values (?, ?)">>,
                 [[1, <<"abc">>], [2, <<"def">>]],
                 true
-              )
-        ),
-        ?_assertEqual({ok, #sql_bulk_response{
-                results = [#sql_bulk_result{rowCount = 3}]
-              }},
-              craterl:sql_bulk(#sql_bulk_request{
-                  stmt = <<"insert into test values (?, ?)">>,
-                  bulk_args = [[1, <<"abc">>], [2, <<"def">>]],
-                  includeTypes = true
-                }
               )
         ),
         ?_assertEqual(

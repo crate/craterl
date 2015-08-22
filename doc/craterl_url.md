@@ -5,8 +5,8 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 .
+
 Copyright (c) (C) 2014, CRATE Technology GmbH
 Licensed to CRATE Technology GmbH ("Crate") under one or more contributor
 license agreements.  See the NOTICE file distributed with this work for
@@ -27,14 +27,14 @@ However, if you have executed another commercial license agreement
 with Crate these terms will supersede the license and you may use the
 software solely pursuant to the terms of the relevant commercial agreement.
 
-
 __Authors:__ Matthias Wahl.
+
 <a name="index"></a>
 
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#create_server_url-2">create_server_url/2</a></td><td></td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#create_server_url-2">create_server_url/2</a></td><td></td></tr><tr><td valign="top"><a href="#server_spec-1">server_spec/1</a></td><td></td></tr></table>
 
 
 <a name="functions"></a>
@@ -45,12 +45,17 @@ __Authors:__ Matthias Wahl.
 
 ### create_server_url/2 ###
 
-
 <pre><code>
 create_server_url(X1::<a href="#type-craterl_server_spec">craterl_server_spec()</a>, Path::boolean()) -&gt; binary()
 </code></pre>
+<br />
 
-<br></br>
+<a name="server_spec-1"></a>
 
+### server_spec/1 ###
 
+<pre><code>
+server_spec(HostPort::{binary(), integer()} | string() | binary()) -&gt; {binary(), integer()}
+</code></pre>
+<br />
 

@@ -27,8 +27,6 @@
 
 -include_lib("common_test/include/ct.hrl").
 
--include("craterl.hrl").
-
 -export([all/0,
 	 init_per_suite/1, end_per_suite/1,
 	 init_per_testcase/2, end_per_testcase/2]).
@@ -55,34 +53,37 @@ end_per_suite(Config) ->
 
 init_per_testcase(bulk_query_test, Config) ->
   Client = ?config(client, Config),
-  {ok, #sql_response{} = _SqlResponse} = craterl:sql(Client, <<"create table test (id int primary key, name string) with (number_of_replicas=0)">>, [], true),
+  {ok, _SqlResponse} = craterl:sql(Client, <<"create table test (id int primary key, name string) with (number_of_replicas=0)">>, [], true),
   ct_helpers:wait_for_green_state(<<"localhost:48200">>),
   Config;
 init_per_testcase(_, Config) ->
   Config.
 end_per_testcase(bulk_query_test, Config) ->
   Client = ?config(client, Config),
-  {ok, #sql_response{} = _SqlResponse} = craterl:sql(Client, <<"drop table test">>, [], true),
+  {ok, _SqlResponse} = craterl:sql(Client, <<"drop table test">>, [], true),
   Config;
 end_per_testcase(_, Config) ->
   Config.
 
 simple_query_test_binary(_Config) ->
   {ok, Response} = craterl:sql(<<"select 'abc', 42, id, name from sys.cluster">>),
-  [<<"'abc'">>, <<"42">>, <<"id">>, <<"name">>] = Response#sql_response.cols,
-  1 = Response#sql_response.rowCount,
-  [[<<"abc">>|Tail]] = Response#sql_response.rows,
+  [<<"'abc'">>, <<"42">>, <<"id">>, <<"name">>] = craterl_resp:column_names(Response),
+  1 = craterl_resp:row_count(Response),
+  [[<<"abc">>|Tail]] = craterl_resp:rows(Response),
   [42|_] = Tail.
 
 simple_query_test_str(_Config) ->
-  {ok, #sql_response{cols=[<<"id">>,<<"name">>,<<"master_node">>, <<"settings">>]}} = craterl:sql("select * from sys.cluster").
+  {ok, Response} = craterl:sql("select * from sys.cluster"),
+  [<<"id">>,<<"name">>,<<"master_node">>, <<"settings">>] = craterl_resp:column_names(Response).
 
 bulk_query_test(Config) ->
   Client = ?config(client, Config),
-  {ok, #sql_bulk_response{results = Results}} = craterl:sql_bulk(Client, <<"insert into test (id, name) values (?, ?)">>, [[1, <<"Ford">>], [2, <<"Trillian">>], [3, <<"Zaphod">>]], true),
+  {ok, SqlBulkResponse} = craterl:sql_bulk(Client, <<"insert into test (id, name) values (?, ?)">>, [[1, <<"Ford">>], [2, <<"Trillian">>], [3, <<"Zaphod">>]], true),
+  Results = craterl_resp:bulk_results(SqlBulkResponse),
   3 = length(Results),
-  SumFun = fun (#sql_bulk_result{rowCount = RowCount}, Acc) -> Acc + RowCount end,
+  SumFun = fun (BulkResult, Acc) -> Acc + craterl_resp:row_count(BulkResult) end,
   3 = lists:foldl(SumFun, 0, Results),
-  {ok, #sql_bulk_response{results = Results2}} = craterl:sql_bulk(Client, <<"insert into test (id, name) values (?, ?)">>, [[1, <<"Ford">>], [2, <<"Trillian">>], [3, <<"Zaphod">>]], true),
+  {ok, SqlBulkResponse2} = craterl:sql_bulk(Client, <<"insert into test (id, name) values (?, ?)">>, [[1, <<"Ford">>], [2, <<"Trillian">>], [3, <<"Zaphod">>]], true),
+  Results2 = craterl_resp:bulk_results(SqlBulkResponse2),
   3 = length(Results2),
-  [-2, -2, -2] = lists:map(fun(#sql_bulk_result{rowCount = RowCount}) -> RowCount end, Results2).  % -2 means failure
+  [-2, -2, -2] = lists:map(fun craterl_resp:row_count/1, Results2).  % -2 means failure

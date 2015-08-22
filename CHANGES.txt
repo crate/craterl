@@ -2,6 +2,13 @@
 CHANGES for craterl
 ===================
 
+Unreleased
+==========
+
+ - remove include file ``craterl.hrl`` and don't expose records in API
+
+ - added module ``craterl_resp.erl`` for handling craterl responses
+
 2015/01/08 0.2.1
 ================
 

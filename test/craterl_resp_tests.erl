@@ -26,39 +26,41 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(ct_helpers).
+-module(craterl_resp_tests).
 -author("Matthias Wahl").
 
-%% API
--export([
-  wait_for_green_state/1,
-  get_blob_content/1,
-  validate_blob_content/3
-]).
+-include("../src/craterl_priv.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
-wait_for_green_state(Host) ->
-  {ok, 200, _Stuff, _Ref} = hackney:request(get, <<Host/binary, "/_cluster/health?wait_for_status=green">>).
-
-get_blob_content(DataFun) ->
-  get_blob_content(DataFun, [], 0).
-get_blob_content(DataFun, Acc, Calls) ->
-  case DataFun() of
-    {ok, done} -> {list_to_binary(Acc), Calls};
-    {ok, Content} when is_binary(Content) ->
-      get_blob_content(DataFun, [Content|Acc], Calls+1)
-  end.
-validate_blob_content(DataFun, ExpectedContent, ExpectedCalls) ->
-  validate_blob_content(DataFun, ExpectedContent, ExpectedCalls, 0, 0).
-validate_blob_content(DataFun, ExpectedContent, ExpectedCalls, Calls, Pos) ->
-  case DataFun() of
-    {ok, done} -> ok;
-    {ok, Content} ->
-      ByteSize = byte_size(Content),
-      ExpectedPart = binary:part(ExpectedContent, Pos, ByteSize),
-      if Content /= ExpectedPart ->
-        ct:print("Expected: ~p~n", [ExpectedPart]),
-        ct:print("Got: ~p~n", [Content]);
-        true -> ok
-      end,
-      validate_blob_content(DataFun, ExpectedContent, ExpectedCalls, Calls+1, Pos+ByteSize)
-  end.
+column_test_() ->
+  Response = #sql_response{
+  rows=[[1, <<"a">>, 3.5], [2, <<"b">>, 4.6], [3, <<"c">>, 5.7]],
+    rowCount = 3,
+    cols = [<<"id">>, <<"name">>, <<"score">>],
+    colTypes = [1, 2, 3],
+    duration = 10
+  },
+  {
+    "testing that extracting a column from a response works as expected",
+    [
+      ?_assertEqual(
+        [1, 2, 3],
+        craterl_resp:column(Response, 1)
+      ),
+      ?_assertEqual(
+        [<<"a">>, <<"b">>, <<"c">>],
+        craterl_resp:column(Response, 2)
+      ),
+      ?_assertEqual(
+        [3.5, 4.6, 5.7],
+        craterl_resp:column(Response, 3)
+      ),
+      ?_assertError(
+        function_clause, craterl_resp:column(Response, 4)
+      ),
+      ?_assertEqual(
+        [],
+        craterl_resp:column(#sql_response{rows = []}, 1)
+      )
+    ]
+  }.

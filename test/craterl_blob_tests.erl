@@ -25,7 +25,7 @@
 -module(craterl_blob_tests).
 -author("mat").
 
--include("craterl.hrl").
+-include("../src/craterl_priv.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 test_server_conf() ->

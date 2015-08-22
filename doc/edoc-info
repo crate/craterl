@@ -1,6 +1,5 @@
 %% encoding: UTF-8
 {application,craterl}.
-{packages,[]}.
 {modules,[bin_to_hex,craterl,craterl_app,craterl_blob,craterl_config,
-          craterl_gen_server,craterl_hash,craterl_sql,craterl_sup,
-          craterl_url]}.
+          craterl_gen_server,craterl_hash,craterl_resp,craterl_sql,
+          craterl_sup,craterl_url]}.

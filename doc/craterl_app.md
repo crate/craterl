@@ -5,8 +5,8 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 .
+
 Copyright (c) (C) 2014, CRATE Technology GmbH
 Licensed to CRATE Technology GmbH ("Crate") under one or more contributor
 license agreements.  See the NOTICE file distributed with this work for
@@ -28,6 +28,7 @@ with Crate these terms will supersede the license and you may use the
 software solely pursuant to the terms of the relevant commercial agreement.
 
 __Behaviours:__ [`application`](application.md).
+
 <a name="index"></a>
 
 ## Function Index ##
@@ -46,11 +47,9 @@ __Behaviours:__ [`application`](application.md).
 
 `start(StartType, StartArgs) -> any()`
 
-
 <a name="stop-1"></a>
 
 ### stop/1 ###
 
 `stop(X1) -> any()`
-
 

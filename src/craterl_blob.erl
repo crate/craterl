@@ -35,7 +35,7 @@
 -compile(export_all).
 -endif.
 
--include("craterl.hrl").
+-include("craterl_priv.hrl").
 
 %%% API %%%
 

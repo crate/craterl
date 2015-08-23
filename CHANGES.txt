@@ -2,8 +2,8 @@
 CHANGES for craterl
 ===================
 
-Unreleased
-==========
+2015/08/23 0.2.3
+================
 
  - remove include file ``craterl.hrl`` and don't expose records in API
 

@@ -1,7 +1,7 @@
 {application, craterl,
  [
   {description, "erlang client for crate"},
-  {vsn, "0.2.1"},
+  {vsn, "0.2.3"},
   {registered, []},
   {modules, [
     bin_to_hex,

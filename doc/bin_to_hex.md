@@ -5,8 +5,8 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 .
+
 Copyright (c) (C) 2014, CRATE Technology GmbH
 Licensed to CRATE Technology GmbH ("Crate") under one or more contributor
 license agreements.  See the NOTICE file distributed with this work for
@@ -26,6 +26,7 @@ under the License.
 However, if you have executed another commercial license agreement
 with Crate these terms will supersede the license and you may use the
 software solely pursuant to the terms of the relevant commercial agreement.
+
 <a name="index"></a>
 
 ## Function Index ##
@@ -43,5 +44,4 @@ software solely pursuant to the terms of the relevant commercial agreement.
 ### hexstring/1 ###
 
 `hexstring(X1) -> any()`
-
 

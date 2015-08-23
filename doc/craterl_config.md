@@ -5,9 +5,8 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
-
 stuff handling craterl configuration.
+
 Copyright (c) (C) 2014, CRATE Technology GmbH
 Licensed to CRATE Technology GmbH ("Crate") under one or more contributor
 license agreements.  See the NOTICE file distributed with this work for
@@ -28,8 +27,8 @@ However, if you have executed another commercial license agreement
 with Crate these terms will supersede the license and you may use the
 software solely pursuant to the terms of the relevant commercial agreement.
 
-
 __Authors:__ Matthias Wahl.
+
 <a name="index"></a>
 
 ## Function Index ##
@@ -47,53 +46,37 @@ create the configuration for use in hackney requests from the server config.</td
 
 ### apply_defaults/0 ###
 
-
 <pre><code>
 apply_defaults() -&gt; {<a href="proplists.md#type-proplist">proplists:proplist()</a>, <a href="proplists.md#type-proplist">proplists:proplist()</a>}
 </code></pre>
-
-<br></br>
-
-
+<br />
 
 <a name="apply_defaults-1"></a>
 
 ### apply_defaults/1 ###
 
-
 <pre><code>
 apply_defaults(Options::<a href="proplists.md#type-proplist">proplists:proplist()</a>) -&gt; {<a href="proplists.md#type-proplist">proplists:proplist()</a>, <a href="proplists.md#type-proplist">proplists:proplist()</a>}
 </code></pre>
-
-<br></br>
-
-
+<br />
 
 <a name="get-2"></a>
 
 ### get/2 ###
 
-
 <pre><code>
 get(Key::term(), Config::<a href="proplists.md#type-proplist">proplists:proplist()</a>) -&gt; undefined | term()
 </code></pre>
-
-<br></br>
-
-
+<br />
 
 <a name="request_config-1"></a>
 
 ### request_config/1 ###
 
-
 <pre><code>
 request_config(Config::<a href="proplists.md#type-proplist">proplists:proplist()</a>) -&gt; <a href="proplists.md#type-proplist">proplists:proplist()</a>
 </code></pre>
-
-<br></br>
-
-
+<br />
 
 create the configuration for use in hackney requests from the server config
 

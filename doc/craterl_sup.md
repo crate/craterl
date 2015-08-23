@@ -5,8 +5,8 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 .
+
 Copyright (c) (C) 2014, CRATE Technology GmbH
 Licensed to CRATE Technology GmbH ("Crate") under one or more contributor
 license agreements.  See the NOTICE file distributed with this work for
@@ -28,6 +28,7 @@ with Crate these terms will supersede the license and you may use the
 software solely pursuant to the terms of the relevant commercial agreement.
 
 __Behaviours:__ [`supervisor`](supervisor.md).
+
 <a name="index"></a>
 
 ## Function Index ##
@@ -46,19 +47,14 @@ __Behaviours:__ [`supervisor`](supervisor.md).
 
 `init(X1) -> any()`
 
-
 <a name="start_client-3"></a>
 
 ### start_client/3 ###
 
-
 <pre><code>
-start_client(ClientSpec::<a href="#type-craterl_client_spec">craterl_client_spec()</a>, Servers::[<a href="#type-craterl_server_spec">craterl_server_spec()</a>], Options::[term()]) -&gt; atom()
+start_client(ClientSpec::<a href="#type-craterl_client_spec">craterl_client_spec()</a>, Servers::[<a href="#type-craterl_server_spec">craterl_server_spec()</a>], Options::[term()]) -&gt; <a href="#type-craterl_client_ref">craterl_client_ref()</a>
 </code></pre>
-
-<br></br>
-
-
+<br />
 
 <a name="start_link-0"></a>
 
@@ -66,17 +62,12 @@ start_client(ClientSpec::<a href="#type-craterl_client_spec">craterl_client_spec
 
 `start_link() -> any()`
 
-
 <a name="stop_client-1"></a>
 
 ### stop_client/1 ###
 
-
 <pre><code>
-stop_client(ClientName::atom()) -&gt; ok | {error, term()}
+stop_client(ClientRef::<a href="#type-craterl_client_ref">craterl_client_ref()</a>) -&gt; ok | {error, term()}
 </code></pre>
-
-<br></br>
-
-
+<br />
 

@@ -31,7 +31,7 @@
 
 -include_lib("common_test/include/ct.hrl").
 
--include("craterl.hrl").
+-include("../src/craterl_priv.hrl").
 
 -export([all/0,
 	 init_per_suite/1, end_per_suite/1,

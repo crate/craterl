@@ -29,7 +29,6 @@
 -module(craterl_url_tests).
 -author("Matthias Wahl").
 
--include("craterl.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 server_uri_from_spec_test_() ->

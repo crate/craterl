@@ -25,7 +25,7 @@
 -module(craterl_gen_server_tests).
 -author("mat").
 
--include("craterl.hrl").
+-include("../src/craterl_priv.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -define(setup(F, Start), {setup, Start, fun stop/1, F}).

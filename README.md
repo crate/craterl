@@ -68,7 +68,7 @@ Options = [
         {cacerts, MyDerEncodedCaCerts}
     ]}
 ].
-ClientRef = craterl:new(craterl, [{<<"localhost", 4200}], Options).
+ClientRef = craterl:new({local, craterl}, [{<<"localhost">>, 4200}], Options).
 ```
 
 See the documentation of the ```craterl``` module for more detailed api documentation.
@@ -80,16 +80,12 @@ of ```craterl:sql()```:
 
 ```erlang
 {ok Response} = craterl:sql("select id, name from sys.cluster").
-[[<<"89b8f6bf-4082-415b-937e-7de66b67f6fe">>, <<"crate">>]] = Response#sql_response.rows.
-[<<"id">>,<<"name">>] = Response#sql_response.cols.
+[[<<"89b8f6bf-4082-415b-937e-7de66b67f6fe">>, <<"crate">>]] = craterl_resp:rows(Response).
+[<<"id">>,<<"name">>] = craterl_resp:column_names(Response).
 
 Stmt = <<"select * from user where id in (?, ?, ?)">>.
 Args = [1, 2, 3].
 {ok, Response2} = craterl:sql(ClientRef, Stmt, Args).
-
-Request = #sql_request{stmt = <<"select count(*) from sys.nodes">>}.
-{ok, Response3} = craterl:sql(Request).
-[[3]] = Response3#sql_response.rows.
 ```
 
 For issuing multiple INSERT / DELETE or UPDATE requests with one roundtrip, 
@@ -99,21 +95,19 @@ the ```craterl:sql_bulk()``` functions can be used:
 Stmt = <<"insert into t (id, name) values (?, ?)">>.
 BulkArgs = [[1, <<"Ford">>], [2, <<"Trillian">>], [3, <<"Zaphod">>]].
 {ok, BulkResponse} = craterl:sql_bulk(ClientRef, Stmt, BulkArgs).
-[[{<<"rowcount">>,1}], 
- [{<<"rowcount">>,1}], 
- [{<<"rowcount">>,1}]] = BulkResponse#sql_bulk_response.results.
+BulkResults = craterl_resp:bulk_results(BulkResponse).
+[1,1,1] = lists:map(fun craterl_resp:row_count/1, BulkResults).
 
 Stmt2 = <<"update t set new_column=? where id=?">>.
 BulkArgs2 = [[<<"funky">>, 1], [<<"shizzle">>, 2], [<<"indeed">>, 3]].
 {ok, BulkResponse2} = craterl:sql_bulk(Stmt2, BulkArgs2).
-[[{<<"rowcount">>,1}], 
- [{<<"rowcount">>,1}], 
- [{<<"rowcount">>,1}]] = BulkResponse2#sql_bulk_response.results.
+BulkResults2 = craterl_resp:bulk_results(BulkResponse2).
+[1,1,1] = lists:map(fun craterl_resp:row_count/1, BulkResults2).
 
 {ok, SelectResponse} = craterl:sql("select * from t").
 [[1,<<"Ford">>,<<"funky">>],
  [2,<<"Trillian">>,<<"shizzle">>],
- [3,<<"Zaphod">>,<<"indeed">>]] = SelectResponse#sql_response.rows.
+ [3,<<"Zaphod">>,<<"indeed">>]] = craterl_resp:rows(SelectResponse).
 ```
 
 Every sql api function has a variant that accepts a ```ClientRef``` as first 

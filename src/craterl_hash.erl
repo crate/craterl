@@ -34,7 +34,7 @@
 
 -define(CHUNK_SIZE, 4194304).
 
--spec(sha1Hex(binary()) -> {ok, binary()}).
+-spec sha1Hex(Content::binary()) -> {ok, binary()}.
 sha1Hex(Content) when is_binary(Content) ->
   Ctx = crypto:hash_init(sha),
   hashContent(Ctx, <<>>, Content).
@@ -57,7 +57,7 @@ hashContent(Ctx, Content, Rest) ->
 %%
 %% @doc hashing the file contents of the file at FilePath
 %%
--spec( sha1HexFile(binary()|string()) -> {ok, binary()}|{error, term()}).
+-spec sha1HexFile(FilePath::binary()|string()) -> {ok, binary()}|{error, term()}.
 sha1HexFile(FilePath) ->
   case file:open(FilePath, [read, raw, binary]) of
     {ok, FileHandle} ->
@@ -73,7 +73,7 @@ sha1HexFile(FilePath) ->
 %%
 %% @doc hashing the file contents of the file at FilePath and return the file data too
 %%
--spec( sha1HexFileData(binary()|string()) -> {ok, binary(), binary()} | {error, term()}).
+-spec sha1HexFileData(FilePath::binary()|string()) -> {ok, binary(), binary()} | {error, term()}.
 sha1HexFileData(FilePath) ->
   case file:open(FilePath, [read, raw, binary]) of
     {ok, FileHandle} ->

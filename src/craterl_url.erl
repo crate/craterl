@@ -39,7 +39,7 @@
 -compile(export_all).
 -endif.
 
--include("craterl.hrl").
+-include("craterl_priv.hrl").
 
 -define(SQLPATH, <<"/_sql">>).
 

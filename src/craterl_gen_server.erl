@@ -26,7 +26,7 @@
 
 -behaviour(gen_server).
 
--include("craterl.hrl").
+-include("craterl_priv.hrl").
 
 %% API
 -export([start_link/3, stop/1,
@@ -38,7 +38,7 @@
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+         terminate/2, code_change/3, format_status/2]).
 
 -record(connections, {
   activelist   :: {[ craterl_server_spec() ], [ craterl_server_spec() ]},
@@ -65,21 +65,25 @@
 start_link(ClientSpec, Servers, Options) ->
   gen_server:start_link(ClientSpec, ?MODULE, [{servers, Servers}, {options, Options}], []).
 
--spec get_server(atom()) -> {ok, craterl_server_conf()} | none_active.
-get_server(ClientName) ->
-    gen_server:call(ClientName, get_server).
+-spec get_server(craterl_client_ref()) -> {ok, craterl_server_conf()} | none_active.
+get_server(ClientRef) ->
+    gen_server:call(ClientRef, get_server).
 
-set_servers(ClientName, ServerList) when is_list(ServerList) ->
-    gen_server:call(ClientName, {set_servers, ServerList}).
+-spec set_servers(craterl_client_ref(), [craterl_server_spec()]) -> ok.
+set_servers(ClientRef, ServerList) when is_list(ServerList) ->
+    gen_server:call(ClientRef, {set_servers, ServerList}).
 
-add_active(ClientName, Server) ->
-    gen_server:call(ClientName, {add_active, Server}).
+-spec add_active(craterl_client_ref(), craterl_server_spec()) -> ok.
+add_active(ClientRef, Server) ->
+    gen_server:call(ClientRef, {add_active, Server}).
 
-add_inactive(ClientName, Server) ->
-    gen_server:call(ClientName, {add_inactive, Server}).
+-spec add_inactive(craterl_client_ref(), craterl_server_spec()) -> ok.
+add_inactive(ClientRef, Server) ->
+    gen_server:call(ClientRef, {add_inactive, Server}).
 
-stop(ClientName) ->
-  gen_server:cast(ClientName, stop).
+-spec stop(craterl_client_ref()) -> ok.
+stop(ClientRef) ->
+  gen_server:cast(ClientRef, stop).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -248,3 +252,6 @@ lookup_server(#connections{activelist = {[Server|Active], Iterated}} = Connectio
     Server,
     Connections#connections{activelist = {Active, [Server|Iterated]}}
   }.
+
+format_status(_, _) ->
+  ok.

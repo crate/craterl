@@ -29,8 +29,6 @@
 -module(craterl_config).
 -author("Matthias Wahl").
 
--include("craterl.hrl").
-
 -define(CRATERL_DEFAULT_POOLNAME, crate).
 -define(CRATERL_DEFAULT_POOLSIZE, 20).
 -define(CRATERL_DEFAULT_TIMEOUT, 60000).
@@ -39,13 +37,13 @@
 %% API
 -export([apply_defaults/0, apply_defaults/1, get/2, request_config/1]).
 
--spec request_config(proplists:proplist()) -> proplists:proplist().
 %%--------------------------------------------------------------------
 %% @doc
 %% create the configuration for use in hackney requests from the server config
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec request_config(proplists:proplist()) -> proplists:proplist().
 request_config(Config) ->
   PoolName = craterl_config:get(poolname, Config),
   Timeout = craterl_config:get(timeout, Config),

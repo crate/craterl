@@ -25,9 +25,9 @@
 
 -module(craterl_sup).
 
--include("craterl.hrl").
-
 -behaviour(supervisor).
+
+-include("craterl_priv.hrl").
 
 %% API
 -export([start_link/0, start_client/3, stop_client/1]).
@@ -42,11 +42,11 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
--spec start_client(ClientSpec::craterl_client_spec(), Servers::[craterl_server_spec()], Options::[term()]) -> atom().
+-spec start_client(ClientSpec::craterl_client_spec(), Servers::[craterl_server_spec()], Options::[term()]) -> craterl_client_ref().
 start_client(ClientSpec, Servers, Options) ->
-  ClientName = client_name(ClientSpec),
+  ClientRef = client_ref(ClientSpec),
   case supervisor:start_child(?MODULE, {
-    ClientName,
+    ClientRef,
     {
       craterl_gen_server, start_link, [ClientSpec, Servers, Options]
     },
@@ -56,14 +56,14 @@ start_client(ClientSpec, Servers, Options) ->
     [craterl_gen_server]
   }) of
     {ok, _ChildPid} ->
-      ClientName;
-    {error, {already_started, _Pid}} -> {error, {already_started, client_name(ClientSpec)}}
+      ClientRef;
+    {error, {already_started, _Pid}} -> {error, {already_started, ClientRef}}
   end.
 
--spec stop_client(atom()) -> ok | {error, term()}.
-stop_client(ClientName) ->
-  supervisor:terminate_child(?MODULE, ClientName),
-  supervisor:delete_child(?MODULE, ClientName).
+-spec stop_client(craterl_client_ref()) -> ok | {error, term()}.
+stop_client(ClientRef) ->
+  supervisor:terminate_child(?MODULE, ClientRef),
+  supervisor:delete_child(?MODULE, ClientRef).
 
 
 %% ===================================================================
@@ -84,8 +84,8 @@ init([]) ->
 %% @doc
 %% return the name to be used when calling the server
 %%
--spec client_name(ClientSpec:: craterl_client_spec()) -> atom().
-client_name(ClientSpec) ->
+-spec client_ref(ClientSpec:: craterl_client_spec()) -> atom().
+client_ref(ClientSpec) ->
   case ClientSpec of
      {local, Name} when is_atom(Name) -> Name;
      {global, Name} when is_atom(Name) -> Name;

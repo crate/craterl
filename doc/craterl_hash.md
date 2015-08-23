@@ -5,8 +5,8 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 .
+
 Copyright (c) (C) 2014, CRATE Technology GmbH
 Licensed to CRATE Technology GmbH ("Crate") under one or more contributor
 license agreements.  See the NOTICE file distributed with this work for
@@ -26,6 +26,7 @@ under the License.
 However, if you have executed another commercial license agreement
 with Crate these terms will supersede the license and you may use the
 software solely pursuant to the terms of the relevant commercial agreement.
+
 <a name="index"></a>
 
 ## Function Index ##
@@ -42,26 +43,19 @@ software solely pursuant to the terms of the relevant commercial agreement.
 
 ### sha1Hex/1 ###
 
-
 <pre><code>
 sha1Hex(Content::binary()) -&gt; {ok, binary()}
 </code></pre>
-
-<br></br>
-
-
+<br />
 
 <a name="sha1HexFile-1"></a>
 
 ### sha1HexFile/1 ###
 
-
 <pre><code>
 sha1HexFile(FilePath::binary() | string()) -&gt; {ok, binary()} | {error, term()}
 </code></pre>
-
-<br></br>
-
+<br />
 
 hashing the file contents of the file at FilePath
 
@@ -69,13 +63,10 @@ hashing the file contents of the file at FilePath
 
 ### sha1HexFileData/1 ###
 
-
 <pre><code>
 sha1HexFileData(FilePath::binary() | string()) -&gt; {ok, binary(), binary()} | {error, term()}
 </code></pre>
-
-<br></br>
-
+<br />
 
 hashing the file contents of the file at FilePath and return the file data too
 

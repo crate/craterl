@@ -11,15 +11,7 @@ not yet verified to be rock-solid in a production environment.
 
 ## Compatibility ##
 
-Tested with OTP releases ``R16B`` and ``17``.
-
-## Installation ##
-
-Calling make should be enough to get you going:
-
-```
-make
-```
+Tested with OTP releases ``R16B``, ``17`` and ``18``.
 
 ## Usage ##
 

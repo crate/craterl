@@ -2,7 +2,7 @@
  [
   {description, "erlang client for crate"},
   {vsn, "0.2.3"},
-  {registered, []},
+  {registered, [craterl_sup]},
   {modules, [
     bin_to_hex,
     craterl,

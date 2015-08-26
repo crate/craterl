@@ -23,10 +23,7 @@ then
     cd -
 fi
 
-make clean get-deps compile || exit 1
-
-echo "running eunit..."
-make eunit || exit 1
+./rebar3 as test clean compile || exit 1
 
 function cleanup() {
   echo "stopping crate..."
@@ -39,7 +36,6 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-echo "running common test..."
 echo "starting crate 1 ..."
 ${CRATE_DIR}/bin/crate \
     -Des.network.host=127.0.0.1 \
@@ -63,7 +59,7 @@ curl -XPOST localhost:48200/_sql -d'{"stmt":"select * from sys.cluster"}' 2&> /d
 echo "crate 1 started."
 echo "crate 2 started."
 curl -XPOST localhost:48201/_sql -d'{"stmt":"select * from sys.cluster"}' 2&> /dev/null
-make ct || exit 1
+./rebar3 as test do eunit, ct, cover || exit 1
 RETVAL=$?
 
 exit $RETVAL

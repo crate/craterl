@@ -1,13 +1,10 @@
-/ebin/
 /.eunit/
 /.idea/
-/deps/
 /log/
 /ct/logs/
-/.concrete/
 /_build/
 mix.lock
-rebar.config.lock
+rebar.lock
 *.o
 *.beam
 *.plt

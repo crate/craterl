@@ -13,7 +13,5 @@ sudo: false
 
 before-install:
   - sudo apt-get install wget curl
-install:
-    make .concrete/DEV_MODE compile
 script:
   - ./priv/ci/run_tests.sh

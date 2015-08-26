@@ -13,5 +13,7 @@ sudo: false
 
 before-install:
   - sudo apt-get install wget curl
+install:
+  - ./rebar3 do update, compile
 script:
   - ./priv/ci/run_tests.sh

@@ -15,11 +15,73 @@ not yet verified to be rock-solid in a production environment.
 
 Tested with OTP releases ``R16B``, ``17`` and ``18``.
 
+## Installation
+
+### Rebar 3
+
+Craterl is built using [rebar3](https://github.com/rebar/rebar3), 
+using it in your project is highly recommended. 
+
+Here is how you'd add it to your dependencies.
+
+If you want to load a craterl release from [hex.pm](https://hex.pm/packages/craterl), configure it like so:
+
+```erlang
+{deps,[
+  {craterl,"0.2.3"}
+]}.
+```
+
+Or load it directly from github:
+
+```erlang
+{deps,[
+    {craterl, {git, "git://github.com/crate/craterl.git", {tag, "0.2.3"}}}
+]}.
+```
+
+### Rebar 2
+
+You can also use craterl in your project using [rebar2](https://github.com/rebar/rebar),
+though [rebar3](https://github.com/rebar/rebar3) is recommended.
+
+With rebar2 you need to load craterl from github. 
+Use a git tag or a commit ref in order to get reproducable builds:
+
+```erlang
+{deps,[
+    {craterl, "0.2.3", {git, "git://github.com/crate.craterl.git", {tag, "0.2.3}}}
+]}.
+```
+
+
+### Mix
+
+Craterl releases are hosted on [hex.pm](https://hex.pm/packages/craterl).
+
+Declare it as a dependency in your ``mix.exs`` file:
+
+```elixir
+def deps do
+    [{:craterl, "~> 0.2.3"}]
+end
+```
+
+Or load it directly from github:
+
+```elixir
+def deps do
+    [{:craterl, git: "git://github.com/crate/craterl.git", tag: "0.2.3"}]
+end
+``` 
+
 ## Usage ##
 
+Normally you'd start craterl as part of your application's startup, so the 
+Erlang/OTP application framework will take care of actually starting craterl.
 
-If the ```craterl``` application has not yet been started,
-start it using:
+However, if you want to play around with craterl on the erlang or
+elixir shell you can start it up with the following convenience method:
 
 ```erlang
 ok = craterl:start().

@@ -1,0 +1,26 @@
+{application, 'fucks',
+ [{description, "A collection of all the fucks that are given"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, {'fucks_app', []}},
+  {applications,
+   [kernel,
+    stdlib,
+    cowboy,
+    craterl
+   ]},
+  {env,[
+   {crate_host, "localhost:4200"},
+   {listen_port, 8080}
+  ]},
+  {modules, [
+   fucks_handler,
+   fuck_handler,
+   fucks_sup,
+   fucks_app
+  ]},
+
+  {contributors, []},
+  {licenses, []},
+  {links, []}
+ ]}.

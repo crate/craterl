@@ -9,3 +9,4 @@ rebar.lock
 *.beam
 *.plt
 erl_crash.dump
+/*.iml

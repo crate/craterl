@@ -40,11 +40,13 @@ start(_StartType, _StartArgs) ->
   ListenPort = application:get_env(fucks, listen_port, 8080),
   CraterlClient = craterl:new([CraterlServerSpec]),
   {ok, _} = fucks_model:prepare_fucks(CraterlClient),
+  HandlerOpts = [{craterl, CraterlClient}],
   Dispatch = cowboy_router:compile([
     %% {HostMatch, list({PathMatch, Handler, Opts})}
     {'_', [
-      {"/fucks/:id", fuck_handler,  [{craterl, CraterlClient}]},
-      {"/fucks/",    fucks_handler, [{craterl, CraterlClient}]}
+      {"/fucks/:id", fuck_handler,  HandlerOpts},
+      {"/fucks/",    fucks_handler, HandlerOpts},
+      {"/search/",   fucks_search_handler, HandlerOpts}
     ]}
   ]),
   {ok, _} = cowboy:start_http(fucks_listener, 100,

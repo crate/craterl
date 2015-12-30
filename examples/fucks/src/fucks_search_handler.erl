@@ -23,49 +23,31 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(fuck_handler).
+-module(fucks_search_handler).
+
+-behaviour(cowboy_http_handler).
 
 %% API
--export([
-  init/3,
-  rest_init/2,
-  allowed_methods/2,
-  delete_resource/2,
-  resource_exists/2,
-  content_types_provided/2]).
+-export([init/3, handle/2, terminate/3]).
 
--export([to_json/2]).
+-record(state, {
+  craterl :: craterl:craterl_client_ref()
+}).
 
-init({tcp, http}, _Req, _Opts) ->
-  {upgrade, protocol, cowboy_rest}.
+init(_, Req, Opts) ->
+  {craterl, CraterlClientRef} = lists:keyfind(craterl, 1, Opts),
+  {ok, Req, #state{craterl=CraterlClientRef}}.
 
-rest_init(Req, Opts) ->
-  {craterl, ClientRef} = lists:keyfind(craterl, 1, Opts),
-  {ok, Req, #{craterl => ClientRef}}.
+handle(Req, #state{craterl=CraterlClientRef}=State) ->
+  {ok, Req3} = case cowboy_req:qs_val(<<"q">>, Req) of
+    {SearchTerm, Req2} when is_binary(SearchTerm) ->
+      Fucks = fucks_model:search_fucks(CraterlClientRef, SearchTerm),
+      cowboy_req:reply(200, [
+        {<<"content-type">>, <<"application/json">>}
+      ], jsx:encode(Fucks), Req2);
+    {_, Req2} -> cowboy_req:reply(400, Req2)
+  end,
+  {ok, Req3, State}.
 
-allowed_methods(Req, State) ->
-  {[<<"GET">>, <<"DELETE">>], Req, State}.
-
-delete_resource(Req, #{craterl := ClientRef}=State) ->
-  {Id, Req2} = cowboy_req:binding(id, Req),
-  ok = fucks_model:delete_fuck(ClientRef, Id),
-  {true, Req2, State}.
-
-content_types_provided(Req, State) ->
-  {[
-    {{ <<"application">>, <<"json">>, []}, to_json}
-  ], Req, State}.
-
-resource_exists(Req, #{craterl := CrateClientRef}=State) ->
-  case cowboy_req:binding(id, Req) of
-    {undefined, _Req2} ->
-      throw(should_not_happen);
-    {Id, Req2} ->
-      case fucks_model:get_fuck(CrateClientRef, Id) of
-        not_found -> {false, Req2, State};
-        Fuck -> {true, Req2, maps:put(fuck, Fuck, State)}
-      end
-  end.
-
-to_json(Req, #{fuck := Fuck}=State) ->
-  {jsx:encode(Fuck), Req, State}.
+terminate(_, _, _) ->
+  ok.
